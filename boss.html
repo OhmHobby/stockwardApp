@@ -1,0 +1,1935 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StockWard — Boss</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600&family=Roboto+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/lang.js"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #f8f9fa;
+        --surface: #ffffff;
+        --border: #dadce0;
+        --divider: #f1f3f4;
+        --focus: #1a73e8;
+        --primary: #1a73e8;
+        --primary-bg: #e8f0fe;
+        --success: #137333;
+        --success-bg: #e6f4ea;
+        --warning: #b06000;
+        --warning-bg: #fef7e0;
+        --danger: #c5221f;
+        --danger-bg: #fce8e6;
+        --text: #202124;
+        --text-2: #3c4043;
+        --muted: #5f6368;
+        --radius: 8px;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 14px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ── Login ────────────────────────────────────────── */
+      #screen-login {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        background: var(--bg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        padding: 1.5rem;
+      }
+      #screen-login[hidden] {
+        display: none;
+      }
+
+      .login-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 2rem;
+        width: 100%;
+        max-width: 340px;
+      }
+      .login-logo {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 700;
+        font-size: 1.4rem;
+        margin-bottom: 0.15rem;
+      }
+      .login-logo span {
+        color: var(--primary);
+      }
+      .login-role {
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.4px;
+        color: var(--muted);
+        margin-bottom: 1.5rem;
+        text-transform: uppercase;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      .form-group {
+        margin-bottom: 0.875rem;
+      }
+      .form-label {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 0.3rem;
+      }
+      .form-input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 0.9rem;
+        padding: 0.6rem 0.75rem;
+        outline: none;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      .form-input:focus {
+        border-color: var(--focus);
+        box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+      }
+      .login-hint {
+        font-size: 0.76rem;
+        color: var(--muted);
+        margin-bottom: 1rem;
+        line-height: 1.5;
+      }
+      .btn-block {
+        width: 100%;
+        padding: 0.65rem;
+        border: none;
+        border-radius: 20px;
+        background: var(--primary);
+        color: #fff;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .btn-block:hover:not(:disabled) {
+        background: #1557b0;
+      }
+      .btn-block:disabled {
+        background: var(--border);
+        color: var(--muted);
+        cursor: not-allowed;
+      }
+      .login-err {
+        background: var(--danger-bg);
+        border: 1px solid #f5c6c5;
+        color: var(--danger);
+        border-radius: var(--radius);
+        padding: 0.55rem 0.75rem;
+        font-size: 0.82rem;
+        margin-bottom: 0.875rem;
+        display: none;
+      }
+      .login-toast {
+        background: var(--success-bg);
+        border: 1px solid #ceead6;
+        color: var(--success);
+        border-radius: var(--radius);
+        padding: 0.55rem 0.75rem;
+        font-size: 0.82rem;
+        margin-bottom: 0.875rem;
+        display: none;
+      }
+
+      /* ── App ──────────────────────────────────────────── */
+      #app {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+      }
+      #app[hidden] {
+        display: none;
+      }
+
+      .top-bar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 0 1.5rem;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+        flex-shrink: 0;
+      }
+      .top-logo {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+      }
+      .top-logo span {
+        color: var(--primary);
+      }
+      .top-div {
+        width: 1px;
+        height: 16px;
+        background: var(--border);
+      }
+      .top-user {
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      .top-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }
+      select.top-sel {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        font-family: 'Roboto Mono', monospace;
+        font-size: 0.78rem;
+        padding: 0.28rem 0.55rem;
+        outline: none;
+        cursor: pointer;
+      }
+      .lang-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 0.2rem 0.65rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+      }
+      .lang-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+
+      /* ── Tabs ─────────────────────────────────────────── */
+      .tab-bar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 0 1.5rem;
+        display: flex;
+        flex-shrink: 0;
+      }
+      .tab-btn {
+        padding: 0.7rem 1.1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+        font-family: 'Noto Sans Thai', sans-serif;
+      }
+      .tab-btn:hover:not(.active) {
+        color: var(--text-2);
+        background: var(--divider);
+      }
+      .tab-btn.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+        font-weight: 600;
+      }
+
+      .tab-pane {
+        display: none;
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+      }
+      .tab-pane.active {
+        display: block;
+      }
+
+      /* ── Shared ───────────────────────────────────────── */
+      .page-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      .page-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.05rem;
+        font-weight: 700;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .card-pad {
+        padding: 1.25rem;
+      }
+      .card-label {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--muted);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        margin-bottom: 0.875rem;
+      }
+
+      .btn {
+        padding: 0.45rem 0.95rem;
+        border-radius: 20px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: background 0.15s;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #1557b0;
+      }
+      .btn-outline {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--primary);
+      }
+      .btn-outline:hover:not(:disabled) {
+        background: var(--primary-bg);
+        border-color: var(--primary);
+      }
+      .btn-sm {
+        padding: 0.28rem 0.65rem;
+        font-size: 0.72rem;
+      }
+      .btn-warn {
+        background: var(--warning-bg);
+        color: var(--warning);
+        border: 1px solid #f5e1a4;
+      }
+      .btn-warn:hover:not(:disabled) {
+        background: #fef0c0;
+      }
+      .btn-danger {
+        background: var(--danger-bg);
+        color: var(--danger);
+        border: 1px solid #f5c6c5;
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: #fce8e6;
+      }
+
+      .fctrl {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--text);
+        font-family: 'Noto Sans Thai', sans-serif;
+        font-size: 0.875rem;
+        padding: 0.55rem 0.75rem;
+        outline: none;
+      }
+      .fctrl:focus {
+        border-color: var(--focus);
+        box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1);
+      }
+      .fctrl.mono {
+        font-family: 'Roboto Mono', monospace;
+      }
+      select.fctrl {
+        cursor: pointer;
+      }
+      .fgroup {
+        margin-bottom: 0.875rem;
+      }
+      .fgroup label {
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 500;
+        color: var(--muted);
+        margin-bottom: 0.3rem;
+      }
+
+      .notify {
+        padding: 0.55rem 0.875rem;
+        border-radius: var(--radius);
+        font-size: 0.82rem;
+        margin-bottom: 0.75rem;
+        display: none;
+      }
+      .notify.ok {
+        background: var(--success-bg);
+        border: 1px solid #ceead6;
+        color: var(--success);
+        display: block;
+      }
+      .notify.err {
+        background: var(--danger-bg);
+        border: 1px solid #f5c6c5;
+        color: var(--danger);
+        display: block;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .loader-row {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        color: var(--muted);
+        padding: 1.5rem 0;
+        font-size: 0.875rem;
+      }
+
+      /* Badge */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+      .badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      }
+      .badge-pending {
+        background: var(--divider);
+        color: var(--muted);
+      }
+      .badge-pending::before {
+        background: var(--muted);
+      }
+      .badge-progress {
+        background: var(--warning-bg);
+        color: var(--warning);
+      }
+      .badge-progress::before {
+        background: var(--warning);
+      }
+      .badge-submitted {
+        background: var(--success-bg);
+        color: var(--success);
+      }
+      .badge-submitted::before {
+        background: var(--success);
+      }
+
+      /* ── Overview ─────────────────────────────────────── */
+      .ward-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 0.875rem;
+      }
+      .ward-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem;
+        border-left: 4px solid var(--border);
+      }
+      .ward-card.submitted {
+        border-left-color: var(--success);
+      }
+      .ward-card.in_progress {
+        border-left-color: var(--warning);
+      }
+      .wc-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+      }
+      .wc-id {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 0.85rem;
+        font-weight: 500;
+      }
+      .wc-kpis {
+        display: flex;
+        gap: 0.3rem;
+        margin-top: 0.4rem;
+      }
+      .kpip {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .wc-ts {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.3rem;
+      }
+
+      /* ── Reports ──────────────────────────────────────── */
+      .rpt-toolbar {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+      }
+      .seg {
+        display: flex;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        overflow: hidden;
+      }
+      .seg-btn {
+        padding: 0.32rem 0.85rem;
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 500;
+        font-family: 'Noto Sans Thai', sans-serif;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .seg-btn.active {
+        background: var(--primary);
+        color: #fff;
+      }
+      .chart-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      @media (max-width: 640px) {
+        .chart-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .chart-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem;
+      }
+      .chart-lbl {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-align: center;
+        margin-bottom: 0.875rem;
+      }
+      .chart-card canvas {
+        max-height: 210px;
+      }
+
+      /* Table */
+      .tbl-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+      th {
+        background: var(--divider);
+        padding: 0.5rem 0.875rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 0.7rem;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        white-space: nowrap;
+        border-bottom: 1px solid var(--border);
+      }
+      td {
+        padding: 0.5rem 0.875rem;
+        border-bottom: 1px solid var(--divider);
+        color: var(--text-2);
+        vertical-align: middle;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      tr:hover td {
+        background: var(--divider);
+      }
+      .v-over {
+        color: var(--warning);
+        font-weight: 600;
+      }
+      .v-short {
+        color: var(--danger);
+        font-weight: 600;
+      }
+      .v-match {
+        color: var(--success);
+        font-weight: 600;
+      }
+      .mono-cell {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .cat-chip {
+        display: inline-block;
+        padding: 0.12rem 0.45rem;
+        border-radius: 4px;
+        font-size: 0.68rem;
+        font-weight: 600;
+      }
+
+      /* ── Drug master-detail table ────────────────────── */
+      .drug-row {
+        cursor: pointer;
+        transition: background .12s;
+      }
+      .drug-row td { user-select: none; }
+      .drug-row:hover td { background: var(--divider); }
+      .drug-row.expanded td { background: #EEF3FD; }
+      .expand-icon {
+        color: var(--muted); font-size: .75rem;
+        transition: transform .2s; display: inline-block;
+      }
+      .drug-row.expanded .expand-icon { transform: rotate(90deg); }
+      .ward-detail-row { display: none; }
+      .ward-detail-row.open { display: table-row; }
+      .ward-detail-row td {
+        background: #F8F9FA !important;
+        padding: .5rem .875rem .75rem 2.5rem;
+        border-bottom: 2px solid var(--border);
+      }
+      .ward-grid {
+        display: flex; flex-wrap: wrap; gap: .5rem; padding-top: .25rem;
+      }
+      .ward-chip {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: .35rem .65rem;
+        font-size: .75rem;
+        min-width: 130px;
+      }
+      .ward-chip-id {
+        font-family: 'Roboto Mono', monospace;
+        font-size: .68rem; color: var(--muted);
+        margin-bottom: .15rem;
+      }
+      .ward-chip-nums { display: flex; gap: .5rem; align-items: center; }
+      .ward-chip-par  { color: var(--muted); }
+      .ward-chip-act  { font-weight: 600; }
+
+      /* ── Manage ───────────────────────────────────────── */
+      .mgmt-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+      }
+      @media (max-width: 700px) {
+        .mgmt-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .mgmt-col-title {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 0.92rem;
+        font-weight: 700;
+        margin-bottom: 0.875rem;
+      }
+      .user-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid var(--divider);
+      }
+      .user-row:last-child {
+        border-bottom: none;
+      }
+      .user-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .user-name {
+        font-weight: 500;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .user-meta {
+        font-family: 'Roboto Mono', monospace;
+        font-size: 0.7rem;
+        color: var(--muted);
+        margin-top: 0.1rem;
+      }
+      .user-actions {
+        display: flex;
+        gap: 0.3rem;
+        flex-shrink: 0;
+      }
+      .key-box {
+        background: var(--primary-bg);
+        border: 1px solid #c5d9f8;
+        border-radius: var(--radius);
+        padding: 0.75rem;
+        font-family: 'Roboto Mono', monospace;
+        font-size: 0.72rem;
+        color: var(--primary);
+        margin-top: 0.875rem;
+        word-break: break-all;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── LOGIN ─────────────────────────────────────────────────── -->
+    <div id="screen-login">
+      <div class="login-card">
+        <a href="index.html" class="login-logo" style="text-decoration:none;color:inherit;">Stock<span>Ward</span></a>
+        <div class="login-role" data-i18n="tab_overview">Boss Dashboard</div>
+
+        <div class="login-toast" id="login-toast"></div>
+        <div class="login-err" id="login-err"></div>
+
+        <div class="form-group">
+          <label class="form-label" data-i18n="name_label">ชื่อ-นามสกุล</label>
+          <input
+            id="inp-name"
+            class="form-input"
+            type="text"
+            autocomplete="name"
+            data-i18n-ph="name_ph"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="pass_label">รหัสผ่าน</label>
+          <input
+            id="inp-pass"
+            class="form-input"
+            type="password"
+            autocomplete="current-password"
+            data-i18n-ph="pass_ph"
+          />
+        </div>
+        <p class="login-hint" data-i18n="first_login_note"></p>
+        <button class="btn-block" id="btn-login" onclick="doLogin()">
+          <span data-i18n="login_btn">เข้าสู่ระบบ</span>
+        </button>
+        <div style="margin-top: 1rem; text-align: center">
+          <button class="lang-btn" onclick="toggleLang()">EN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── APP ───────────────────────────────────────────────────── -->
+    <div id="app" hidden>
+      <div class="top-bar">
+        <a href="index.html" class="top-logo" style="text-decoration:none;color:inherit;">Stock<span>Ward</span></a>
+        <div class="top-div"></div>
+        <div class="top-user" id="top-user">—</div>
+        <div class="top-right">
+          <select
+            class="top-sel"
+            id="period-sel"
+            onchange="onPeriodChange()"
+          ></select>
+          <button
+            class="btn btn-outline btn-sm"
+            onclick="exportCSV()"
+            data-i18n="export_csv"
+          >
+            ↓ Export
+          </button>
+          <button class="lang-btn" onclick="toggleLang()">EN</button>
+        </div>
+      </div>
+
+      <div class="tab-bar">
+        <button
+          class="tab-btn active"
+          onclick="switchTab('overview', this)"
+          data-i18n="tab_overview"
+        >
+          ภาพรวม
+        </button>
+        <button
+          class="tab-btn"
+          onclick="switchTab('reports', this)"
+          data-i18n="tab_reports"
+        >
+          รายงาน
+        </button>
+        <button
+          class="tab-btn"
+          onclick="switchTab('manage', this)"
+          data-i18n="tab_manage"
+        >
+          จัดการ
+        </button>
+      </div>
+
+      <!-- OVERVIEW -->
+      <div class="tab-pane active" id="tab-overview">
+        <div class="page-head">
+          <div class="page-title" data-i18n="ov_title">ภาพรวม</div>
+        </div>
+        <div id="ov-content">
+          <div class="loader-row">
+            <div class="spinner"></div>
+            <span data-i18n="loading">กำลังโหลด...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="tab-pane" id="tab-reports">
+        <div class="page-head">
+          <div class="page-title" data-i18n="rpt_title">รายงาน</div>
+        </div>
+        <div class="rpt-toolbar">
+          <div class="seg">
+            <button
+              class="seg-btn active"
+              id="tog-qty"
+              onclick="setMetric('qty')"
+              data-i18n="by_qty"
+            >
+              ปริมาณ
+            </button>
+            <button
+              class="seg-btn"
+              id="tog-value"
+              onclick="setMetric('value')"
+              data-i18n="by_value"
+            >
+              มูลค่า
+            </button>
+          </div>
+          <select
+            class="fctrl"
+            id="ward-filter"
+            style="width: auto; border-radius: 20px"
+            onchange="renderReports()"
+          >
+            <option value="" data-i18n="all_wards">ทุกหน่วยงาน</option>
+          </select>
+          <select
+            class="fctrl"
+            id="cat-filter"
+            style="width: auto; border-radius: 20px"
+            onchange="renderReports()"
+          >
+            <option value="" data-i18n="all_cats">ทุกหมวด</option>
+          </select>
+          <input
+            class="fctrl"
+            id="drug-search"
+            type="search"
+            style="border-radius: 20px; min-width: 180px"
+            placeholder="ค้นหายา / Drug ID…"
+            data-i18n-ph="drug_search_ph"
+            oninput="renderReports()"
+          />
+        </div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-lbl" id="bar-lbl" data-i18n="chart_bar">
+              PAR vs นับได้
+            </div>
+            <canvas id="chart-bar"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-lbl" id="pie-lbl" data-i18n="chart_pie">
+              สัดส่วน
+            </div>
+            <canvas id="chart-pie"></canvas>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div class="card-label" data-i18n="drug_list">รายการยา</div>
+          <div id="drug-table">
+            <div class="loader-row"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MANAGE -->
+      <div class="tab-pane" id="tab-manage">
+        <div class="page-head">
+          <div class="page-title" data-i18n="mgmt_title">จัดการ</div>
+        </div>
+        <div class="mgmt-grid">
+          <div>
+            <div class="mgmt-col-title" data-i18n="asn_title">มอบหมายงาน</div>
+            <div class="card card-pad" style="margin-bottom: 1.25rem">
+              <div class="notify" id="asn-notify"></div>
+              <div class="fgroup">
+                <label data-i18n="asn_period">รอบ</label
+                ><input
+                  class="fctrl mono"
+                  id="asn-period"
+                  placeholder="2026-09"
+                  maxlength="7"
+                />
+              </div>
+              <div class="fgroup">
+                <label data-i18n="asn_ward">หน่วยงาน</label
+                ><select class="fctrl" id="asn-ward">
+                  <option value="" data-i18n="sel_ward">— เลือกหน่วยงาน —</option>
+                  <option value="NONE" style="color:var(--danger)">✕ ยกเลิกการมอบหมาย / Unassign</option>
+                </select>
+              </div>
+              <div class="fgroup">
+                <label data-i18n="asn_worker">ผู้ตรวจสอบ</label
+                ><select class="fctrl" id="asn-worker">
+                  <option value="" data-i18n="sel_worker">
+                    — เลือกพนักงาน —
+                  </option>
+                </select>
+              </div>
+              <button
+                class="btn btn-primary"
+                onclick="createAssignment()"
+                data-i18n="asn_btn"
+              >
+                มอบหมาย
+              </button>
+            </div>
+
+            <div class="mgmt-col-title" data-i18n="cu_title">สร้างผู้ใช้</div>
+            <div class="card card-pad">
+              <div class="notify" id="usr-notify"></div>
+              <div class="fgroup">
+                <label data-i18n="cu_name">ชื่อ</label
+                ><input
+                  class="fctrl"
+                  id="new-name"
+                  placeholder="ชื่อ นามสกุล"
+                />
+              </div>
+              <div class="fgroup">
+                <label data-i18n="cu_role">บทบาท</label>
+                <select class="fctrl" id="new-role" onchange="onRoleChange()">
+                  <option value="worker">Worker</option>
+                  <option value="boss">Boss</option>
+                </select>
+              </div>
+              <div class="fgroup" id="new-ward-grp">
+                <label data-i18n="asn_ward">หน่วยงาน</label
+                ><select class="fctrl" id="new-ward">
+                  <option value="" data-i18n="sel_ward">— เลือก —</option>
+                </select>
+              </div>
+              <button
+                class="btn btn-primary"
+                onclick="createUser()"
+                data-i18n="cu_btn"
+              >
+                สร้างผู้ใช้
+              </button>
+              <div class="key-box" id="key-box" hidden></div>
+            </div>
+          </div>
+
+          <div>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                margin-bottom: 0.875rem;
+              "
+            >
+              <div
+                class="mgmt-col-title"
+                style="margin-bottom: 0"
+                data-i18n="ul_title"
+              >
+                รายชื่อผู้ใช้
+              </div>
+              <button
+                class="btn btn-outline btn-sm"
+                onclick="loadUsers()"
+                data-i18n="reload"
+              >
+                ↻
+              </button>
+            </div>
+            <div class="card card-pad">
+              <div id="user-list">
+                <div class="loader-row"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ── Boss state ────────────────────────────────────────────────────
+      let BS = {
+        session: null, // { name, passwordHash, userId, userName }
+        period: currentPeriod(),
+        metric: 'qty',
+        drugs: [],
+        logs: [],
+        wards: [],
+        users: [],
+        charts: {},
+      };
+
+      // ── Login ─────────────────────────────────────────────────────────
+      document.addEventListener('DOMContentLoaded', () => {
+        ['inp-name', 'inp-pass'].forEach((id) =>
+          document.getElementById(id).addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doLogin();
+          }),
+        );
+        const saved = getSession();
+        if (saved?.passwordHash && saved?.role === 'boss') {
+          BS.session = saved;
+          openApp();
+        }
+        applyLang();
+      });
+
+      async function doLogin() {
+        const name = document.getElementById('inp-name').value.trim();
+        const pass = document.getElementById('inp-pass').value;
+        const err = document.getElementById('login-err');
+        const toast = document.getElementById('login-toast');
+        err.style.display = toast.style.display = 'none';
+
+        if (!name) {
+          err.textContent = t('err_name_empty');
+          err.style.display = 'block';
+          return;
+        }
+        if (!pass) {
+          err.textContent = t('err_pass_empty');
+          err.style.display = 'block';
+          return;
+        }
+
+        const btn = document.getElementById('btn-login');
+        btn.disabled = true;
+        btn.textContent = t('loading');
+
+        try {
+          const hash = await hashPassword(name, pass);
+          const res = await callGAS('auth', { name, passwordHash: hash });
+
+          if (!res.success) {
+            const msg =
+              {
+                wrong_password: t('err_wrong_pass'),
+                user_not_found: t('err_not_found'),
+                account_inactive: t('err_inactive'),
+              }[res.error] ||
+              res.error ||
+              t('err_network');
+            err.textContent = msg;
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = t('login_btn');
+            return;
+          }
+          if (res.role !== 'boss') {
+            err.textContent = t('err_not_boss');
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = t('login_btn');
+            return;
+          }
+          if (res.isNewPassword) {
+            toast.textContent = t('new_pass_toast');
+            toast.style.display = 'block';
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+
+          BS.session = {
+            name,
+            passwordHash: hash,
+            userId: res.userId,
+            userName: res.userName,
+            role: 'boss',
+          };
+          saveSession(BS.session);
+          openApp();
+        } catch (e) {
+          err.textContent = t('err_network');
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = t('login_btn');
+        }
+      }
+
+      async function openApp() {
+        document.getElementById('screen-login').hidden = true;
+        document.getElementById('app').hidden = false;
+        document.getElementById('top-user').textContent =
+          BS.session.userName || 'Boss';
+        buildPeriodSel();
+        await Promise.all([loadWards(), loadUsers()]);
+        await loadData();
+        applyLang();
+      }
+
+      // ── Period ────────────────────────────────────────────────────────
+      function buildPeriodSel() {
+        const sel = document.getElementById('period-sel');
+        const d = new Date();
+        for (let i = 0; i < 12; i++) {
+          const dt = new Date(d.getFullYear(), d.getMonth() - i, 1);
+          const val = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          if (val === BS.period) opt.selected = true;
+          sel.appendChild(opt);
+        }
+      }
+      function onPeriodChange() {
+        BS.period = document.getElementById('period-sel').value;
+        loadData();
+      }
+
+      // ── Data loading ──────────────────────────────────────────────────
+      async function loadData() {
+        await Promise.all([loadDrugs(), loadLogs()]);
+
+        // ── Populate category filter from loaded drugs ──────────────
+        const catSel = document.getElementById('cat-filter');
+        const prevCat = catSel.value;
+        while (catSel.options.length > 1) catSel.remove(1);
+        const seenCats = new Set();
+        BS.drugs.forEach(d => {
+          const cat = d['DRUG_CATEGORY'] || 'general';
+          if (!seenCats.has(cat)) {
+            seenCats.add(cat);
+            const o = document.createElement('option');
+            o.value = cat;
+            o.textContent = getCatLabel(cat);
+            catSel.appendChild(o);
+          }
+        });
+        catSel.value = prevCat; // restore selection if still valid
+
+        renderOverview();
+        renderReports();
+      }
+
+      async function loadWards() {
+        const WARD_SHEET_GID = '1031123185';
+        const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/export?format=csv&gid=${WARD_SHEET_GID}`;
+
+        // Show a loading state on all three selects while fetching
+        ['ward-filter', 'asn-ward', 'new-ward'].forEach((sid) => {
+          const sel = document.getElementById(sid);
+          // Remove any previously loaded ward options (keep only the first placeholder option)
+          while (sel.options.length > 1) sel.remove(1);
+          const loading = document.createElement('option');
+          loading.disabled = true;
+          loading.textContent = t('loading');
+          loading.dataset.wardLoader = '1';
+          sel.appendChild(loading);
+        });
+
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          const csvText = await res.text();
+          const allLines = csvText.split('\n');
+
+          // ── DEBUG: inspect raw CSV so you can verify column layout ──
+          console.group('🗂️ WARD_ID sheet — raw CSV debug');
+          console.log('Header row :', allLines[0]);
+          console.log('Row 1      :', allLines[1]);
+          console.log('Row 2      :', allLines[2]);
+          console.log('Row 3      :', allLines[3]);
+          console.groupEnd();
+
+          const lines = allLines.slice(1); // skip header row
+
+          // Deduplicate: keep only the first occurrence of each WARD_ID
+          const seenIds = new Set();
+          BS.wards = [];
+
+          lines.forEach((line) => {
+            if (!line.trim()) return; // skip blank trailing lines
+            // RFC-4180 CSV split (handles quoted fields with commas)
+            const cols = line
+              .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
+              .map((c) => c.replace(/^"|"$/g, '').trim());
+
+            const wardId    = cols[0]; // Column A — WARD_ID
+            const wardName  = cols[1]; // Column B — WARD_NAME_TH
+            const activeRaw = (cols[3] || '').trim();
+            // Blank = active (opt-out). Only exclude rows explicitly set to FALSE/0/NO.
+            const isActive  = !['FALSE','0','NO'].includes(activeRaw.toUpperCase());
+
+            if (wardId && wardName && isActive && !seenIds.has(wardId)) {
+              seenIds.add(wardId);
+              BS.wards.push({ id: wardId, name: wardName });
+            }
+          });
+
+          // Populate all three ward selects
+          ['ward-filter', 'asn-ward', 'new-ward'].forEach((sid) => {
+            const sel = document.getElementById(sid);
+            // Remove the temporary loading option
+            [...sel.options].forEach((o) => { if (o.dataset.wardLoader) o.remove(); });
+
+            // For asn-ward: ensure the NONE/unassign option is pinned at position 1
+            if (sid === 'asn-ward') {
+              const hasNone = [...sel.options].some((o) => o.value === 'NONE');
+              if (!hasNone) {
+                const none = document.createElement('option');
+                none.value = 'NONE';
+                none.style.color = 'var(--danger)';
+                none.textContent = '✕ ยกเลิกการมอบหมาย / Unassign';
+                sel.insertBefore(none, sel.options[1] || null);
+              }
+            }
+
+            BS.wards.forEach((w) => {
+              const o = document.createElement('option');
+              o.value = w.id;
+              o.textContent = `${w.id} · ${w.name}`;
+              sel.appendChild(o);
+            });
+          });
+
+          console.log(`✅ Loaded ${BS.wards.length} unique wards directly from sheet.`);
+        } catch (e) {
+          console.warn('loadWards failed, falling back to gviz:', e);
+          // Remove loading placeholders before fallback attempt
+          ['ward-filter', 'asn-ward', 'new-ward'].forEach((sid) => {
+            const sel = document.getElementById(sid);
+            [...sel.options].forEach((o) => { if (o.dataset.wardLoader) o.remove(); });
+          });
+          // Graceful fallback to gviz if direct fetch fails (e.g. sheet not public)
+          try {
+            BS.wards = await gviz('WARD_ID', 'SELECT A,B WHERE D=true');
+            ['ward-filter', 'asn-ward', 'new-ward'].forEach((sid) => {
+              const sel = document.getElementById(sid);
+              BS.wards.forEach((w) => {
+                const id = w['WARD_ID'] || '', nm = w['WARD_NAME_TH'] || id;
+                const o = document.createElement('option');
+                o.value = id;
+                o.textContent = `${id} · ${nm}`;
+                sel.appendChild(o);
+              });
+            });
+            console.log('⚠️ Ward data loaded via gviz fallback.');
+          } catch (e2) {
+            console.error('loadWards: both direct fetch and gviz failed.', e2);
+          }
+        }
+      }
+
+      async function loadUsers() {
+        // Direct CSV fetch by sheet name — same opt-out active logic as loadWards()
+        const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/export?format=csv&gid=1225205345`;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          const rawText = await res.text();
+          console.group('👤 USERS sheet — raw CSV debug');
+          console.log('typeof rawText :', typeof rawText);
+          console.log('length         :', rawText.length);
+          console.log('first 300 chars:', rawText.substring(0, 300));
+          console.log('char codes 0-3 :', [...rawText.substring(0,4)].map(c=>c.charCodeAt(0)));
+          console.groupEnd();
+
+          const allLines = rawText.split('\n');
+
+          BS.users = [];
+          allLines.slice(1).forEach((line) => {
+            if (!line.trim()) return;
+            const cols = line
+              .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
+              .map((c) => c.replace(/^"|"$/g, '').trim());
+
+            // USERS columns: A=USER_ID  B=NAME  C=ROLE  D=WARD_ID  E=ACCESS_KEY  F=ACTIVE
+            const userId   = cols[0];
+            const name     = cols[1];
+            const role     = (cols[2] || '').toLowerCase().trim();
+            const wardId   = cols[3] || '';
+            const activeRaw = (cols[5] || '').trim();
+            // Blank = active (opt-out). Exclude only explicit FALSE/0/NO.
+            const isActive = !['FALSE','0','NO'].includes(activeRaw.toUpperCase());
+
+            if (userId && name && isActive) {
+              BS.users.push({ userId, name, role, wardId, activeRaw });
+            }
+          });
+
+          console.log(`✅ Loaded ${BS.users.length} users from sheet.`);
+
+          // Populate asn-worker dropdown (workers only)
+          const sel = document.getElementById('asn-worker');
+          while (sel.options.length > 1) sel.remove(1);
+          BS.users
+            .filter((u) => u.role === 'worker')
+            .forEach((u) => {
+              const o = document.createElement('option');
+              o.value = u.userId;
+              o.textContent = `${u.name} · ${u.wardId || '—'}`;
+              sel.appendChild(o);
+            });
+
+          renderUserList();
+        } catch (e) {
+          console.warn('loadUsers direct fetch failed, falling back to gviz:', e);
+          try {
+            BS.users = await gviz('USERS', 'SELECT A,B,C,D,E,F');
+            const sel = document.getElementById('asn-worker');
+            while (sel.options.length > 1) sel.remove(1);
+            BS.users
+              .filter((u) => (u['ROLE'] || u['C'] || '').toLowerCase() === 'worker')
+              .forEach((u) => {
+                const o = document.createElement('option');
+                o.value = u['USER_ID'] || u['A'] || '';
+                o.textContent = `${u['NAME'] || u['B'] || '—'} · ${u['WARD_ID'] || u['D'] || '—'}`;
+                sel.appendChild(o);
+              });
+            renderUserList();
+          } catch (e2) {
+            console.error('loadUsers: both direct fetch and gviz failed.', e2);
+          }
+        }
+      }
+
+      async function loadDrugs() {
+        try {
+          // ── 1. Drug metadata from MED_ID ──────────────────────────────
+          const medRows = await gviz('MED_ID');
+          const medMap = {};
+          medRows.forEach(m => {
+            const id = (m['DRUG_ID'] || m['MED_ID'] || m['A'] || '').toString().trim();
+            if (!id) return;
+            medMap[id] = {
+              DRUG_NAME:     (m['DRUG_NAME'] || m['NAME'] || m['B'] || id).toString(),
+              DRUG_CATEGORY: (m['DRUG_CATEGORY'] || m['CATEGORY'] || m['C'] || 'general').toString().trim(),
+              UNIT_PRICE:    parseFloat(m['UNIT_PRICE'] ?? m['D']) || 0,
+            };
+          });
+
+          // ── Helper: parse a pivot sheet into { drugId → { wardId → value } } ──
+          function parsePivot(rows) {
+            if (!rows.length) return { map: {}, wardKeys: [] };
+            const sample    = rows[0];
+            const allKeys   = Object.keys(sample);
+            const labelKeys = allKeys.filter(k => !/^[A-Z]$/.test(k));
+            const drugIdKey = labelKeys.find(k => typeof sample[k] === 'string') || 'A';
+            const wardKeys  = labelKeys.filter(k => k !== drugIdKey &&
+                                (sample[k] === null || typeof sample[k] === 'number'));
+            const map = {};
+            rows.forEach(row => {
+              const drugId = (row[drugIdKey] || row['A'] || '').toString().trim();
+              if (!drugId) return;
+              map[drugId] = {};
+              wardKeys.forEach(wid => { map[drugId][wid] = parseFloat(row[wid]) || 0; });
+            });
+            return { map, wardKeys };
+          }
+
+          // ── 2. Fetch both pivot sheets in parallel ────────────────────
+          // MED+WARD_PAR = PAR (target) quantities
+          // MED+WARD     = ACTUAL (counted) quantities
+          const [parPivot, actPivot] = await Promise.all([
+            gviz('MED+WARD_PAR').catch(() => []),
+            gviz('MED+WARD').catch(() => []),
+          ]);
+
+          const { map: parMap, wardKeys } = parsePivot(parPivot);
+          const { map: actMap }           = parsePivot(actPivot);
+
+          if (!wardKeys.length) { BS.drugs = []; return; }
+
+          // ── 3. Build flat drug-ward list ──────────────────────────────
+          const flat = [];
+          Object.keys(parMap).forEach(drugId => {
+            const meta = medMap[drugId] || {};
+            wardKeys.forEach(wid => {
+              flat.push({
+                DRUG_ID:       drugId,
+                DRUG_NAME:     meta.DRUG_NAME     || drugId,
+                DRUG_CATEGORY: meta.DRUG_CATEGORY || 'general',
+                UNIT_PRICE:    meta.UNIT_PRICE     || 0,
+                WARD_ID:       wid,
+                PAR_QTY:       parMap[drugId]?.[wid] ?? 0,
+                ACTUAL_QTY:    actMap[drugId]?.[wid] ?? NaN,
+              });
+            });
+          });
+
+          BS.drugs = flat;
+        } catch (e) {
+          console.error('loadDrugs failed:', e);
+          BS.drugs = [];
+        }
+      }
+      async function loadLogs() {
+        try {
+          BS.logs = await gviz(
+            'LOGS',
+            `SELECT A,B,C,D,E,F,G,H,I,J,K,L,O,P,Q,R WHERE D='${BS.period}'`,
+          );
+        } catch (e) {
+          BS.logs = [];
+        }
+      }
+
+      // ── Overview ──────────────────────────────────────────────────────
+      function renderOverview() {
+        const el = document.getElementById('ov-content');
+        const wm = {};
+        BS.logs.forEach((r) => {
+          const wid = r['WARD_ID'] || r['E'] || '',
+            et  = r['EVENT_TYPE'] || r['B'] || '';
+          if (!wid) return;
+          if (!wm[wid])
+            wm[wid] = {
+              wardId: wid,
+              assigned: null,
+              started: null,
+              submitted: null,
+              kpis: null,
+              cancelled: false,
+            };
+          const ts  = r['TIMESTAMP'] || r['C'] || '';
+          if (et === 'CANCELLED')          { wm[wid].cancelled = true; return; }
+          if (et === 'ASSIGNED')           { wm[wid].cancelled = false; wm[wid].assigned = ts; }
+          if (et === 'STARTED' && !wm[wid].started) wm[wid].started = ts;
+          if (et === 'SUBMITTED_SESSION' && !wm[wid].submitted) {
+            wm[wid].submitted = ts;
+            wm[wid].kpis = [r['KPI1_PASS']??r['O'], r['KPI2_PASS']??r['P'], r['KPI3_PASS']??r['Q'], r['KPI4_PASS']??r['R']];
+          }
+        });
+        // Remove cancelled wards that were never re-assigned after cancellation
+        Object.keys(wm).forEach((k) => { if (wm[k].cancelled) delete wm[k]; });
+        if (!Object.keys(wm).length) {
+          el.innerHTML = `<p style="color:var(--muted);padding:1.5rem 0;font-size:.875rem">${t('ov_no_data')}</p>`;
+          return;
+        }
+        const st = (w) =>
+          w.submitted ? 'submitted' : w.started ? 'in_progress' : 'pending';
+        const lbl = (s) =>
+          s === 'submitted'
+            ? t('status_done')
+            : s === 'in_progress'
+              ? t('status_prog')
+              : t('status_pending');
+        const fmts = (ts) =>
+          ts
+            ? new Date(ts).toLocaleString('th-TH', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '—';
+        let html = `<div class="ward-grid">`;
+        Object.values(wm).forEach((w) => {
+          const s = st(w);
+          const kpis = w.kpis
+            ? w.kpis
+                .map(
+                  (v, i) =>
+                    `<div class="kpip" style="background:${v ? 'var(--success)' : 'var(--danger)'}" title="KPI${i + 1}"></div>`,
+                )
+                .join('')
+            : '';
+          html += `<div class="ward-card ${s}"><div class="wc-top"><div class="wc-id">${esc(w.wardId)}</div><span class="badge badge-${s}">${lbl(s)}</span></div>
+      ${kpis ? `<div class="wc-kpis">${kpis}</div>` : ''}
+      <div class="wc-ts">${t('ts_assigned')}: ${fmts(w.assigned)}</div>
+      ${w.started ? `<div class="wc-ts">${t('ts_started')}: ${fmts(w.started)}</div>` : ''}
+      ${w.submitted ? `<div class="wc-ts">${t('ts_submitted')}: ${fmts(w.submitted)}</div>` : ''}
+    </div>`;
+        });
+        el.innerHTML = html + `</div>`;
+      }
+
+      // ── Reports ───────────────────────────────────────────────────────
+      function setMetric(m) {
+        BS.metric = m;
+        document
+          .getElementById('tog-qty')
+          .classList.toggle('active', m === 'qty');
+        document
+          .getElementById('tog-value')
+          .classList.toggle('active', m === 'value');
+        renderReports();
+      }
+
+      function renderReports() {
+        const wardFilter = document.getElementById('ward-filter').value;
+        const catFilter  = document.getElementById('cat-filter').value;
+        const drugSearch = (document.getElementById('drug-search').value || '').toLowerCase().trim();
+        let drugs = BS.drugs;
+        if (wardFilter)
+          drugs = drugs.filter((d) => (d['WARD_ID'] || d['E']) === wardFilter);
+        if (catFilter)
+          drugs = drugs.filter((d) => (d['DRUG_CATEGORY'] || 'general') === catFilter);
+        if (drugSearch)
+          drugs = drugs.filter((d) =>
+            (d['DRUG_ID']   || '').toLowerCase().includes(drugSearch) ||
+            (d['DRUG_NAME'] || '').toLowerCase().includes(drugSearch));
+        if (!drugs.length) {
+          document.getElementById('drug-table').innerHTML =
+            `<p style="color:var(--muted);padding:1rem 0">${t('ov_no_data')}</p>`;
+          return;
+        }
+
+        const isVal = BS.metric === 'value';
+        const catData = {};
+        drugs.forEach((d) => {
+          const cat = (d['DRUG_CATEGORY'] || d['C'] || 'general').trim();
+          const par = parseFloat(d['PAR_QTY'] ?? d['F']) || 0,
+            act = parseFloat(d['ACTUAL_QTY'] ?? d['G']) || 0,
+            prc = parseFloat(d['UNIT_PRICE'] ?? d['D']) || 0;
+          if (!catData[cat])
+            catData[cat] = { parQ: 0, actQ: 0, parV: 0, actV: 0 };
+          catData[cat].parQ += par;
+          catData[cat].actQ += act;
+          catData[cat].parV += par * prc;
+          catData[cat].actV += act * prc;
+        });
+        const cats = Object.keys(catData);
+        const labels = cats.map((c) => getCatLabel(c));
+        const parArr = cats.map((c) =>
+          isVal ? catData[c].parV : catData[c].parQ,
+        );
+        const actArr = cats.map((c) =>
+          isVal ? catData[c].actV : catData[c].actQ,
+        );
+        const colors = cats.map((c) => CATS[c]?.color || '#5F6368');
+
+        if (BS.charts.bar) BS.charts.bar.destroy();
+        BS.charts.bar = new Chart(document.getElementById('chart-bar'), {
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'PAR',
+                data: parArr,
+                backgroundColor: colors.map((c) => c + '33'),
+                borderColor: colors,
+                borderWidth: 1.5,
+              },
+              {
+                label: t('col_counted'),
+                data: actArr,
+                backgroundColor: colors.map((c) => c + 'BB'),
+                borderColor: colors,
+                borderWidth: 1.5,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { labels: { color: '#5F6368', font: { size: 11 } } },
+            },
+            scales: {
+              x: { ticks: { color: '#5F6368' }, grid: { color: '#F1F3F4' } },
+              y: { ticks: { color: '#5F6368' }, grid: { color: '#F1F3F4' } },
+            },
+          },
+        });
+
+        if (BS.charts.pie) BS.charts.pie.destroy();
+        BS.charts.pie = new Chart(document.getElementById('chart-pie'), {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [
+              {
+                data: parArr,          // PAR is always populated; actArr is 0 until submitted
+                backgroundColor: colors.map((c) => c + 'BB'),
+                borderColor: '#fff',
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: '#5F6368', font: { size: 11 }, padding: 10 },
+              },
+            },
+          },
+        });
+
+        // ── Group flat list → one entry per drug ────────────────────
+        const drugMap = new Map();
+        drugs.forEach(d => {
+          const id = d.DRUG_ID;
+          if (!drugMap.has(id)) {
+            drugMap.set(id, {
+              DRUG_ID:       id,
+              DRUG_NAME:     d.DRUG_NAME,
+              DRUG_CATEGORY: d.DRUG_CATEGORY,
+              UNIT_PRICE:    d.UNIT_PRICE,
+              wards: [],
+            });
+          }
+          drugMap.get(id).wards.push({
+            wardId: d.WARD_ID,
+            par:    parseFloat(d.PAR_QTY)    || 0,
+            act:    parseFloat(d.ACTUAL_QTY),   // may be NaN
+            prc:    parseFloat(d.UNIT_PRICE)  || 0,
+          });
+        });
+
+        const col = (k) => `<th>${t(k)}</th>`;
+        let html = `<div class="tbl-wrap"><table><thead><tr>
+          ${col('col_id')}${col('col_name')}${col('col_cat')}
+          <th>${t('col_par')}</th><th>${t('col_counted')}</th><th>${t('col_var')}</th>
+          ${isVal ? `<th>${t('col_par_val')}</th><th>${t('col_act_val')}</th>` : ''}
+          <th></th>
+        </tr></thead><tbody>`;
+
+        drugMap.forEach((drug, id) => {
+          const cat   = (drug.DRUG_CATEGORY || 'general').trim();
+          const ccol  = CATS[cat]?.color || '#5F6368';
+          const prc   = drug.UNIT_PRICE || 0;
+
+          // Aggregate across all (filtered) wards
+          const totPar = drug.wards.reduce((s, w) => s + w.par, 0);
+          const hasAct = drug.wards.some(w => !isNaN(w.act));
+          const totAct = hasAct ? drug.wards.reduce((s, w) => s + (isNaN(w.act) ? 0 : w.act), 0) : NaN;
+          const diff   = isNaN(totAct) ? null : totAct - totPar;
+          const vc     = diff == null ? '' : diff > 0 ? 'v-over' : diff < 0 ? 'v-short' : 'v-match';
+          const ds     = diff == null ? '—' : (diff > 0 ? '+' : '') + diff;
+          const safeId = CSS.escape(id);
+
+          html += `
+          <tr class="drug-row" onclick="toggleWardDetail('${safeId}')">
+            <td class="mono-cell">${esc(id)}</td>
+            <td>${esc(drug.DRUG_NAME)}</td>
+            <td><span class="cat-chip" style="background:${ccol}18;color:${ccol}">${getCatLabel(cat)}</span></td>
+            <td>${totPar}</td>
+            <td>${isNaN(totAct) ? '—' : totAct}</td>
+            <td class="${vc}">${ds}</td>
+            ${isVal ? `<td>฿${(totPar*prc).toLocaleString('th-TH',{minimumFractionDigits:2})}</td>
+                       <td>฿${(isNaN(totAct)?0:totAct*prc).toLocaleString('th-TH',{minimumFractionDigits:2})}</td>` : ''}
+            <td><span class="expand-icon">▶</span></td>
+          </tr>
+          <tr class="ward-detail-row" id="wd-${safeId}">
+            <td colspan="${isVal ? 9 : 7}">
+              <div class="ward-grid">
+                ${drug.wards.map(w => {
+                  const wdiff = isNaN(w.act) ? null : w.act - w.par;
+                  const wvc   = wdiff == null ? '' : wdiff > 0 ? 'v-over' : wdiff < 0 ? 'v-short' : 'v-match';
+                  const wds   = wdiff == null ? '—' : (wdiff > 0 ? '+' : '') + wdiff;
+                  return `<div class="ward-chip">
+                    <div class="ward-chip-id">${esc(w.wardId)}</div>
+                    <div class="ward-chip-nums">
+                      <span class="ward-chip-par">PAR ${w.par}</span>
+                      <span class="ward-chip-act">${isNaN(w.act) ? '—' : w.act}</span>
+                      <span class="${wvc}" style="font-size:.7rem">${wds}</span>
+                    </div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </td>
+          </tr>`;
+        });
+
+        document.getElementById('drug-table').innerHTML = html + `</tbody></table></div>`;
+      }
+
+      function toggleWardDetail(id) {
+        const row  = document.getElementById('wd-' + id);
+        const drug = row?.previousElementSibling;
+        if (!row) return;
+        const open = row.classList.toggle('open');
+        drug?.classList.toggle('expanded', open);
+      }
+
+      function exportCSV() {
+        if (!BS.drugs.length) { alert(t('ov_no_data')); return; }
+
+        // Build pivot: drug rows × ward columns
+        const wardSet  = [...new Set(BS.drugs.map(d => d.WARD_ID))].sort();
+        const drugMap  = new Map();
+        BS.drugs.forEach(d => {
+          if (!drugMap.has(d.DRUG_ID)) {
+            drugMap.set(d.DRUG_ID, {
+              DRUG_ID: d.DRUG_ID, DRUG_NAME: d.DRUG_NAME,
+              DRUG_CATEGORY: d.DRUG_CATEGORY, UNIT_PRICE: d.UNIT_PRICE,
+            });
+          }
+          const row = drugMap.get(d.DRUG_ID);
+          row[`PAR_${d.WARD_ID}`] = d.PAR_QTY;
+          if (!isNaN(parseFloat(d.ACTUAL_QTY))) row[`ACT_${d.WARD_ID}`] = d.ACTUAL_QTY;
+        });
+
+        downloadCSV([...drugMap.values()], `stockward-${BS.period}.csv`);
+      }
+
+      // ── Manage ────────────────────────────────────────────────────────
+      function renderUserList() {
+        const el = document.getElementById('user-list');
+        if (!BS.users.length) {
+          el.innerHTML = `<p style="color:var(--muted);font-size:.875rem">${t('ov_no_data')}</p>`;
+          return;
+        }
+        let html = '';
+        BS.users.forEach((u) => {
+          const uid  = u.userId  || u['USER_ID'] || '',
+            name = u.name    || u['NAME']    || '—',
+            role = u.role    || u['ROLE']    || 'worker',
+            ward = u.wardId  || u['WARD_ID'] || '—';
+          html += `<div class="user-row">
+      <div class="user-info">
+        <div class="user-name">${esc(name)} <span class="badge ${role === 'boss' ? 'badge-submitted' : 'badge-pending'}" style="font-size:.65rem">${role}</span></div>
+        <div class="user-meta">${uid} · ${ward}</div>
+      </div>
+      <div class="user-actions">
+        <button class="btn btn-warn   btn-sm" onclick="resetPass('${uid}',this)" title="${t('ul_reset_pass')}">🔓</button>
+        <button class="btn btn-danger btn-sm" onclick="deactivate('${uid}',this)"title="${t('ul_deact')}">✕</button>
+      </div>
+    </div>`;
+        });
+        el.innerHTML = html;
+      }
+
+      function onRoleChange() {
+        document.getElementById('new-ward-grp').style.display =
+          document.getElementById('new-role').value === 'boss' ? 'none' : '';
+      }
+
+      async function createUser() {
+        const newName = document.getElementById('new-name').value.trim();
+        const role = document.getElementById('new-role').value;
+        const wardId = document.getElementById('new-ward').value;
+        if (!newName) {
+          notify('usr-notify', 'err', t('err_name_empty'));
+          return;
+        }
+        if (role === 'worker' && !wardId) {
+          notify('usr-notify', 'err', t('err_not_found'));
+          return;
+        }
+        const res = await callGAS('adminCreateUser', {
+          name: BS.session.name,
+          passwordHash: BS.session.passwordHash,
+          newName,
+          role,
+          wardId,
+        });
+        if (res.success) {
+          document.getElementById('key-box').hidden = false;
+          document.getElementById('key-box').textContent =
+            `User ID: ${res.userId}\nName: ${newName}\nRole: ${role}\nWard: ${wardId || '—'}\nPassword: (user sets on first login)`;
+          notify('usr-notify', 'ok', `Created: ${newName}`);
+          document.getElementById('new-name').value = '';
+          await loadUsers();
+        } else notify('usr-notify', 'err', res.error || t('err_network'));
+      }
+
+      async function createAssignment() {
+        const period     = document.getElementById('asn-period').value.trim() || BS.period;
+        const wardId     = document.getElementById('asn-ward').value;
+        const assignedTo = document.getElementById('asn-worker').value;
+
+        if (!assignedTo) {
+          notify('asn-notify', 'err', t('err_not_found'));
+          return;
+        }
+
+        // ── Cancel / Unassign path — same action, empty wardId ───────────
+        if (wardId === 'NONE') {
+          if (!confirm(currentLang === 'th'
+            ? `ยืนยันการยกเลิกการมอบหมายของ "${assignedTo}" รอบ ${period}?`
+            : `Confirm unassigning "${assignedTo}" for period ${period}?`)) return;
+
+          const res = await callGAS('adminCancelAssignment', {
+            name:         BS.session.name,
+            passwordHash: BS.session.passwordHash,
+            period,
+            assignedTo,
+          });
+          if (res.success) {
+            notify('asn-notify', 'ok',
+              currentLang === 'th'
+                ? `ยกเลิกการมอบหมาย ${assignedTo} · ${period} ✓`
+                : `Unassigned ${assignedTo} · ${period} ✓`);
+            await loadLogs();
+            renderOverview();
+          } else notify('asn-notify', 'err', res.error || t('err_network'));
+          return;
+        }
+
+        // ── Normal assign path ─────────────────────────────────────────
+        if (!wardId) {
+          notify('asn-notify', 'err', t('err_not_found'));
+          return;
+        }
+        const res = await callGAS('adminCreateAssignment', {
+          name:         BS.session.name,
+          passwordHash: BS.session.passwordHash,
+          period,
+          wardId,
+          assignedTo,
+        });
+        if (res.success) {
+          notify('asn-notify', 'ok', `${wardId} · ${period} ✓`);
+          await loadLogs();
+          renderOverview();
+        } else notify('asn-notify', 'err', res.error || t('err_network'));
+      }
+
+      async function resetPass(userId, btn) {
+        if (!confirm(t('confirm_reset'))) return;
+        btn.disabled = true;
+        const res = await callGAS('adminResetPassword', {
+          name: BS.session.name,
+          passwordHash: BS.session.passwordHash,
+          userId,
+        });
+        btn.disabled = false;
+        if (res.success) {
+          alert('Password reset. User must set new password on next login.');
+        } else alert('Error: ' + res.error);
+      }
+
+      async function deactivate(userId, btn) {
+        if (!confirm(t('confirm_deact'))) return;
+        btn.disabled = true;
+        const res = await callGAS('adminToggleUser', {
+          name: BS.session.name,
+          passwordHash: BS.session.passwordHash,
+          userId,
+          active: false,
+        });
+        btn.disabled = false;
+        if (res.success) await loadUsers();
+        else alert('Error: ' + res.error);
+      }
+
+      function notify(id, type, msg) {
+        const el = document.getElementById(id);
+        el.className = 'notify ' + type;
+        el.textContent = msg;
+        setTimeout(() => (el.className = 'notify'), 5000);
+      }
+      function switchTab(name, btn) {
+        document
+          .querySelectorAll('.tab-btn')
+          .forEach((b) => b.classList.remove('active'));
+        document
+          .querySelectorAll('.tab-pane')
+          .forEach((p) => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+      }
+
+      // ── i18n ──────────────────────────────────────────────────────────
+      function applyLang() {
+        applyI18nAttrs();
+        // Refresh dynamic content that uses t()
+        if (!document.getElementById('app').hidden) {
+          renderOverview();
+          renderReports();
+          renderUserList();
+          document.getElementById('tog-qty').textContent = t('by_qty');
+          document.getElementById('tog-value').textContent = t('by_value');
+          const wfOpt = document.getElementById('ward-filter')?.options[0];
+          if (wfOpt) wfOpt.textContent = t('all_wards');
+          const cfOpt = document.getElementById('cat-filter')?.options[0];
+          if (cfOpt) cfOpt.textContent = t('all_cats');
+          // Re-label dynamic category options in their current language
+          const catSel = document.getElementById('cat-filter');
+          if (catSel) {
+            [...catSel.options].forEach(o => {
+              if (o.value) o.textContent = getCatLabel(o.value);
+            });
+          }
+          const ds = document.getElementById('drug-search');
+          if (ds) ds.placeholder = t('drug_search_ph');
+        }
+      }
+    </script>
+  </body>
+</html>

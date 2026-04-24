@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockWard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="js/config.js"></script>
+  <script src="js/lang.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #F8F9FA;
+      --surface:  #FFFFFF;
+      --border:   #DADCE0;
+      --primary:  #1A73E8;
+      --text:     #202124;
+      --muted:    #5F6368;
+      --divider:  #F1F3F4;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: "Noto Sans Thai", "Plus Jakarta Sans", sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Top bar ──────────────────────────────────────── */
+    .top {
+      display: flex; align-items: center; padding: .75rem 1.5rem;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .logo { font-family: "Plus Jakarta Sans", sans-serif; font-weight: 700; font-size: 1rem; }
+    .logo span { color: var(--primary); }
+    .lang-btn {
+      margin-left: auto;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); border-radius: 999px;
+      padding: .25rem .75rem; font-size: .78rem; font-weight: 600;
+      cursor: pointer; font-family: "Plus Jakarta Sans", sans-serif;
+      transition: border-color .15s, color .15s;
+    }
+    .lang-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+    /* ── Main ─────────────────────────────────────────── */
+    main {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2.5rem 1.5rem;
+    }
+
+    .hero-logo { font-family: "Plus Jakarta Sans", sans-serif; font-size: 2.25rem; font-weight: 700; letter-spacing: -.75px; }
+    .hero-logo span { color: var(--primary); }
+    .hero-tag { color: var(--muted); font-size: .9rem; margin-top: .3rem; margin-bottom: 2.5rem; }
+
+    /* ── Role cards ───────────────────────────────────── */
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; max-width: 520px; }
+    @media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
+
+    .role-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      display: flex; flex-direction: column; gap: .5rem;
+      transition: border-color .2s, box-shadow .2s, transform .15s;
+      cursor: pointer;
+    }
+    .role-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 12px rgba(26,115,232,.12);
+      transform: translateY(-2px);
+    }
+    .role-card:active { transform: translateY(0); }
+
+    .role-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; margin-bottom: .25rem;
+    }
+    .ic-blue  { background: #E8F0FE; }
+    .ic-green { background: #E6F4EA; }
+
+    .role-title { font-family: "Plus Jakarta Sans", sans-serif; font-weight: 700; font-size: .95rem; }
+    .role-desc  { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+    .role-go    { font-size: .8rem; font-weight: 600; color: var(--primary); margin-top: auto; padding-top: .5rem; }
+
+    /* ── Footer ───────────────────────────────────────── */
+    footer { text-align: center; padding: 1.25rem; color: var(--muted); font-size: .75rem; border-top: 1px solid var(--divider); }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <a href="index.html" class="logo" style="text-decoration:none;color:inherit;">Stock<span>Ward</span></a>
+    <button class="lang-btn" onclick="toggleLang()">EN</button>
+  </div>
+
+  <main>
+    <div class="hero-logo">Stock<span>Ward</span></div>
+    <p class="hero-tag" data-i18n="tagline">ระบบตรวจสอบยาคงคลัง</p>
+
+    <div class="cards">
+      <a class="role-card" href="worker.html">
+        <div class="role-icon ic-blue">👷</div>
+        <div class="role-title" data-i18n="idx_worker_title">พนักงาน / Worker</div>
+        <div class="role-desc"  data-i18n="idx_worker_desc">เข้าสู่หน้านับยาประจำหน่วยงาน</div>
+        <div class="role-go"    data-i18n="idx_go">เข้าสู่ระบบ →</div>
+      </a>
+
+      <a class="role-card" href="boss.html">
+        <div class="role-icon ic-green">👑</div>
+        <div class="role-title" data-i18n="idx_boss_title">ผู้ดูแลระบบ / Boss</div>
+        <div class="role-desc"  data-i18n="idx_boss_desc">แดชบอร์ดสำหรับเภสัชกรและผู้บริหาร</div>
+        <div class="role-go"    data-i18n="idx_go">เข้าสู่ระบบ →</div>
+      </a>
+    </div>
+  </main>
+
+  <footer>StockWard v3 · GAS + GitHub Pages</footer>
+
+  <script>
+    function applyLang() { applyI18nAttrs(); }
+    applyLang();
+  </script>
+</body>
+</html>

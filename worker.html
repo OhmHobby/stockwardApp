@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockWard — Worker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="js/config.js"></script>
+  <script src="js/lang.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:           #F8F9FA;
+      --surface:      #FFFFFF;
+      --border:       #DADCE0;
+      --focus:        #1A73E8;
+      --primary:      #1A73E8;
+      --primary-bg:   #E8F0FE;
+      --success:      #137333;
+      --success-bg:   #E6F4EA;
+      --warning:      #B06000;
+      --warning-bg:   #FEF7E0;
+      --danger:       #C5221F;
+      --danger-bg:    #FCE8E6;
+      --text:         #202124;
+      --text-2:       #3C4043;
+      --muted:        #5F6368;
+      --divider:      #F1F3F4;
+      --radius:       8px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: "Noto Sans Thai", sans-serif; font-size: 14px; min-height: 100vh; }
+
+    /* ── Screens ─────────────────────────────────────── */
+    .screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; }
+    .screen[hidden] { display: none; }
+    #screen-form { display: block; min-height: 100vh; }
+    #screen-form[hidden] { display: none; }
+
+    /* ── Shared top bar ──────────────────────────────── */
+    .top-bar {
+      display: flex; align-items: center; padding: .65rem 1.25rem;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .top-logo { font-family: "Plus Jakarta Sans", sans-serif; font-weight: 700; font-size: .95rem; }
+    .top-logo span { color: var(--primary); }
+    .top-right { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+    .lang-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 999px; padding: .2rem .65rem; font-size: .75rem; font-weight: 600;
+      cursor: pointer; font-family: "Plus Jakarta Sans", sans-serif;
+      transition: border-color .15s, color .15s;
+    }
+    .lang-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .top-ward {
+      font-family: "Roboto Mono", monospace; font-size: .72rem;
+      background: var(--primary-bg); color: var(--primary);
+      padding: .2rem .6rem; border-radius: 999px; white-space: nowrap;
+    }
+    .progress-strip { height: 3px; background: var(--border); }
+    .progress-fill  { height: 100%; background: var(--primary); transition: width .4s ease; width: 0%; }
+
+    /* ── Login card ──────────────────────────────────── */
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px;
+    }
+    .login-logo { font-family: "Plus Jakarta Sans", sans-serif; font-weight: 700; font-size: 1.4rem; margin-bottom: .2rem; }
+    .login-logo span { color: var(--primary); }
+    .login-sub { color: var(--muted); font-size: .85rem; margin-bottom: 1.5rem; }
+
+    .form-group { margin-bottom: .875rem; }
+    .form-label { display: block; font-size: .78rem; font-weight: 500; color: var(--muted); margin-bottom: .3rem; }
+    .form-input {
+      width: 100%; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); color: var(--text);
+      font-family: "Noto Sans Thai", sans-serif; font-size: .9rem;
+      padding: .6rem .75rem; outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .form-input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(26,115,232,.1); }
+
+    .login-hint { font-size: .76rem; color: var(--muted); margin-bottom: 1rem; line-height: 1.5; }
+
+    .btn-primary {
+      width: 100%; padding: .65rem; border: none; border-radius: 20px;
+      background: var(--primary); color: #fff;
+      font-family: "Plus Jakarta Sans", sans-serif; font-size: .9rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #1557B0; }
+    .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    .login-err {
+      background: var(--danger-bg); border: 1px solid #F5C6C5;
+      color: var(--danger); border-radius: var(--radius);
+      padding: .55rem .75rem; font-size: .82rem; margin-bottom: .875rem; display: none;
+    }
+    .toast {
+      background: var(--success-bg); border: 1px solid #CEEAD6;
+      color: var(--success); border-radius: var(--radius);
+      padding: .55rem .75rem; font-size: .82rem; margin-bottom: .875rem; display: none;
+    }
+
+    /* ── Spinner ─────────────────────────────────────── */
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .9s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .load-msg { color: var(--muted); font-size: .875rem; }
+
+    /* ── Error card ──────────────────────────────────── */
+    .err-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; max-width: 340px; width: 100%; text-align: center; }
+    .err-icon  { font-size: 2.5rem; margin-bottom: .75rem; }
+    .err-title { font-family: "Plus Jakarta Sans", sans-serif; font-weight: 700; font-size: 1rem; color: var(--danger); margin-bottom: .4rem; }
+    .err-body  { color: var(--muted); font-size: .875rem; line-height: 1.6; }
+    .err-back  { margin-top: 1.25rem; background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: .4rem 1rem; font-size: .82rem; cursor: pointer; color: var(--muted); }
+
+    /* ── Stat bar (Simplified) ───────────────────────── */
+    .stat-bar { display: flex; gap: 1.25rem; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .85rem 1rem; margin-bottom: 1.25rem; }
+    .stat-item { text-align: center; padding: 0 1rem; }
+    .stat-num  { font-family: "Plus Jakarta Sans", sans-serif; font-size: 1.25rem; font-weight: 700; line-height: 1; color: var(--primary); }
+    .stat-lbl  { font-size: .75rem; color: var(--muted); margin-top: .3rem; font-weight: 500; }
+    .stat-div  { width: 1px; height: 32px; background: var(--border); }
+
+    /* ── Category section ────────────────────────────── */
+    .page-body { max-width: 680px; margin: 0 auto; padding: 1.25rem 1.25rem 6rem; }
+    .cat-section { margin-bottom: .75rem; }
+    .cat-header { display: flex; align-items: center; gap: .65rem; padding: .6rem .875rem; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); cursor: pointer; user-select: none; margin-bottom: .5rem; transition: background .15s; }
+    .cat-header:hover { background: var(--divider); }
+    .cat-stripe { width: 4px; height: 16px; border-radius: 2px; flex-shrink: 0; }
+    .cat-name   { font-weight: 600; font-size: .875rem; flex: 1; }
+    .cat-count  { font-size: .72rem; background: var(--divider); color: var(--muted); padding: .15rem .5rem; border-radius: 999px; }
+    .cat-chevron{ color: var(--muted); font-size: .7rem; transition: transform .2s; }
+    .cat-section.collapsed .cat-chevron { transform: rotate(-90deg); }
+    .cat-section.collapsed .drug-list   { display: none; }
+
+    /* ── Drug row (Simplified for pure counting) ─────── */
+    .drug-list { display: flex; flex-direction: column; gap: .35rem; }
+    .drug-row {
+      display: grid; grid-template-columns: auto 1fr 80px;
+      align-items: center; gap: .85rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: .75rem .875rem;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .drug-row:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(26,115,232,.1); }
+    .drug-id { font-family: "Roboto Mono", monospace; font-size: .72rem; color: var(--muted); background: var(--divider); padding: .2rem .5rem; border-radius: 4px; white-space: nowrap; }
+    .drug-name { font-size: .9rem; line-height: 1.35; font-weight: 500; }
+    .drug-input {
+      width: 100%; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface); color: var(--text);
+      font-family: "Roboto Mono", monospace; font-size: 1rem; font-weight: 600;
+      text-align: center; padding: .5rem; outline: none;
+      -moz-appearance: textfield; transition: border-color .15s;
+    }
+    .drug-input::-webkit-outer-spin-button,
+    .drug-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .drug-input:focus { border-color: var(--focus); }
+
+    /* ── Add Extra Button ────────────────────────────── */
+    .btn-add { background: var(--surface); border: 2px dashed var(--border); color: var(--primary); font-weight: 600; text-align: center; padding: .85rem; border-radius: var(--radius); cursor: pointer; width: 100%; margin-top: .5rem; transition: border-color .15s, background .15s; font-family: "Noto Sans Thai", sans-serif; font-size: .9rem; }
+    .btn-add:hover { border-color: var(--primary); background: var(--primary-bg); }
+
+    /* ── Section divider ─────────────────────────────── */
+    .sec-div { display: flex; align-items: center; gap: .75rem; margin: 1.75rem 0 1rem; }
+    .sec-div-line { flex: 1; height: 1px; background: var(--border); }
+    .sec-div-text { font-family: "Plus Jakarta Sans", sans-serif; font-size: .7rem; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+
+    /* ── KPI ─────────────────────────────────────────── */
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .875rem 1rem; margin-bottom: .5rem; }
+    .kpi-top  { display: flex; align-items: center; gap: .75rem; }
+    .kpi-label{ flex: 1; font-size: .875rem; line-height: 1.4; }
+    .seg { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+    .seg-btn { padding: .3rem .7rem; border: none; background: transparent; color: var(--muted); font-size: .78rem; font-weight: 600; cursor: pointer; font-family: "Noto Sans Thai", sans-serif; transition: background .15s, color .15s; }
+    .seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+    .seg-btn.pass.active { background: var(--success-bg); color: var(--success); }
+    .seg-btn.fail.active { background: var(--danger-bg);  color: var(--danger);  }
+    .kpi-note { display: none; margin-top: .65rem; width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .55rem .75rem; color: var(--text); font-family: "Noto Sans Thai", sans-serif; font-size: .875rem; resize: vertical; min-height: 52px; outline: none; }
+    .kpi-note:focus { border-color: var(--focus); }
+    .kpi-card.failed .kpi-note { display: block; }
+
+    /* ── Notes ───────────────────────────────────────── */
+    .note-group { margin-bottom: .75rem; }
+    .note-label { display: block; font-size: .78rem; font-weight: 500; color: var(--muted); margin-bottom: .3rem; }
+    .note-area  { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .6rem .75rem; color: var(--text); font-family: "Noto Sans Thai", sans-serif; font-size: .875rem; resize: vertical; min-height: 52px; outline: none; }
+    .note-area:focus { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(26,115,232,.1); }
+
+    /* ── Submit bar ──────────────────────────────────── */
+    .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: .75rem 1.25rem; box-shadow: 0 -2px 8px rgba(60,64,67,.1); }
+    .submit-inner { max-width: 680px; margin: 0 auto; display: flex; align-items: center; gap: 1rem; }
+    .submit-info  { flex: 1; }
+    .submit-main  { font-size: .875rem; color: var(--text); font-weight: 500; }
+    .submit-sub   { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+    .btn-submit { padding: .6rem 1.5rem; border: none; border-radius: 20px; background: var(--primary); color: #fff; font-family: "Plus Jakarta Sans", sans-serif; font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 1px 3px rgba(26,115,232,.35); transition: background .15s; }
+    .btn-submit:hover:not(:disabled) { background: #1557B0; }
+    .btn-submit:disabled { background: var(--border); color: var(--muted); box-shadow: none; cursor: not-allowed; }
+
+    /* ── Success ─────────────────────────────────────── */
+    .success-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; max-width: 340px; width: 100%; text-align: center; }
+    .success-icon  { font-size: 3rem; margin-bottom: .75rem; }
+    .success-title { font-family: "Plus Jakarta Sans", sans-serif; font-size: 1.3rem; font-weight: 700; color: var(--success); margin-bottom: .4rem; }
+    .success-sub   { color: var(--muted); font-size: .875rem; margin-bottom: 1.25rem; }
+    .session-pill  { font-family: "Roboto Mono", monospace; font-size: .72rem; background: var(--divider); color: var(--muted); padding: .35rem .875rem; border-radius: 999px; display: inline-block; }
+
+    /* ── Add Item Modal ──────────────────────────────── */
+    .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-backdrop[hidden] { display: none; }
+    .modal-card { background: var(--surface); width: 90%; max-width: 400px; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .modal-title { font-family: "Plus Jakarta Sans", sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.5rem; }
+    .btn-text { background: transparent; border: none; font-weight: 600; color: var(--muted); cursor: pointer; padding: .5rem 1rem; border-radius: 999px; }
+    .btn-text:hover { background: var(--divider); }
+
+    @media (max-width: 480px) {
+      .drug-id { display: none; }
+      .drug-row { grid-template-columns: 1fr 80px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── SCREEN: Login ─────────────────────────────────────────── -->
+<div class="screen" id="screen-login">
+  <div class="login-card">
+    <a href="index.html" class="login-logo" style="text-decoration:none;color:inherit;">Stock<span>Ward</span></a>
+    <div class="login-sub" data-i18n="login_title">เข้าสู่ระบบ</div>
+
+    <div class="toast"    id="login-toast"></div>
+    <div class="login-err" id="login-err"></div>
+
+    <div class="form-group">
+      <label class="form-label" data-i18n="name_label">ชื่อ-นามสกุล</label>
+      <input id="inp-name" class="form-input" type="text" autocomplete="name" data-i18n-ph="name_ph" placeholder="กรอกชื่อตามที่ลงทะเบียนไว้">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="pass_label">รหัสผ่าน</label>
+      <input id="inp-pass" class="form-input" type="password" autocomplete="current-password" data-i18n-ph="pass_ph" placeholder="กรอกรหัสผ่าน">
+    </div>
+
+    <p class="login-hint" data-i18n="first_login_note">ครั้งแรก? รหัสที่กรอกจะถูกบันทึกเป็นรหัสประจำตัว</p>
+
+    <button class="btn-primary" id="btn-login" onclick="doLogin()">
+      <span data-i18n="login_btn">เข้าสู่ระบบ</span>
+    </button>
+
+    <div style="margin-top:1rem;text-align:center">
+      <button class="lang-btn" onclick="toggleLang()" style="margin:0 auto">EN</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCREEN: Loading ───────────────────────────────────────── -->
+<div class="screen" id="screen-loading" hidden>
+  <div class="spinner"></div>
+  <div class="load-msg" id="load-msg" data-i18n="loading">กำลังโหลด...</div>
+</div>
+
+<!-- ── SCREEN: Error ────────────────────────────────────────── -->
+<div class="screen" id="screen-error" hidden>
+  <div class="err-card">
+    <div class="err-icon">⚠️</div>
+    <div class="err-title" id="err-title">Error</div>
+    <div class="err-body"  id="err-body"></div>
+    <button class="err-back" onclick="show('screen-login')">← Back</button>
+  </div>
+</div>
+
+<!-- ── SCREEN: Form ──────────────────────────────────────────── -->
+<div id="screen-form" hidden>
+  <div class="top-bar">
+    <a href="index.html" class="top-logo" style="text-decoration:none;color:inherit;">Stock<span>Ward</span></a>
+    <div class="top-right">
+      <div class="top-ward" id="hdr-ward">—</div>
+      <button class="lang-btn" onclick="toggleLang()">EN</button>
+    </div>
+  </div>
+  <div class="progress-strip"><div class="progress-fill" id="progress"></div></div>
+
+  <div class="page-body">
+    <div class="stat-bar">
+      <div class="stat-item"><div class="stat-num" id="stat-counted">0</div><div class="stat-lbl" data-i18n="w_counted">ระบุยอดแล้ว</div></div>
+      <div class="stat-div"></div>
+      <div class="stat-item"><div class="stat-num" id="stat-total">0</div><div class="stat-lbl" data-i18n="w_total">รายการทั้งหมด</div></div>
+    </div>
+
+    <!-- Drug sections injected here by JS -->
+
+    <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-text" data-i18n="kpi_title">KPI</div><div class="sec-div-line"></div></div>
+    <div id="kpi-container"></div>
+
+    <div class="sec-div"><div class="sec-div-line"></div><div class="sec-div-text" data-i18n="notes_title">บันทึก</div><div class="sec-div-line"></div></div>
+    <div class="note-group"><label class="note-label" data-i18n="narc_label">ยาเสพติด</label><textarea class="note-area" id="note-narcotic" data-i18n-ph="narc_ph" placeholder="ระบุหากพบปัญหา..."></textarea></div>
+    <div class="note-group"><label class="note-label" data-i18n="cold_label">Cold Chain</label><textarea class="note-area" id="note-cold" data-i18n-ph="cold_ph" placeholder="อุณหภูมิ..."></textarea></div>
+    <div class="note-group"><label class="note-label" data-i18n="other_label">อื่น ๆ</label><textarea class="note-area" id="note-other" data-i18n-ph="other_ph" placeholder="ข้อสังเกต..."></textarea></div>
+  </div>
+
+  <div class="submit-bar">
+    <div class="submit-inner">
+      <div class="submit-info">
+        <div class="submit-main" id="sb-main">—</div>
+        <div class="submit-sub"  id="sb-sub">—</div>
+      </div>
+      <button class="btn-submit" id="btn-submit" disabled onclick="doSubmit()">
+        <span data-i18n="submit_btn">ส่งผลการตรวจ</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCREEN: Success ───────────────────────────────────────── -->
+<div class="screen" id="screen-success" hidden>
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <div class="success-title" data-i18n="success_title">ส่งสำเร็จ</div>
+    <div class="success-sub" id="success-sub">—</div>
+    <div class="session-pill" id="success-session">—</div>
+  </div>
+</div>
+
+<!-- ── Add Item Modal (RESTORED DATALIST) ────────────────────── -->
+<div class="modal-backdrop" id="modal-add" hidden>
+  <div class="modal-card">
+    <div class="modal-title">เพิ่มรายการยา (Add Medication)</div>
+    <div class="form-group">
+      <label class="form-label">ค้นหารหัส หรือ ชื่อยา (Search ID or Name)</label>
+      <input id="inp-add-med" class="form-input" type="text" list="dl-all-meds" placeholder="พิมพ์ชื่อหรือรหัสยาเพื่อค้นหา...">
+      <datalist id="dl-all-meds"></datalist>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-text" onclick="document.getElementById('modal-add').hidden = true" data-i18n="cancel">ยกเลิก</button>
+      <button class="btn-primary" style="width:auto; padding:.5rem 1.25rem;" onclick="doAddItem()">เพิ่มลงรายการ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Utilities ─────────────────────────────────────────────────────
+function esc(str) {
+  return String(str || "").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── State ─────────────────────────────────────────────────────────
+let S = {
+  session: null,   // { name, passwordHash, userId, userName, wardId }
+  assignmentId: null, period: null,
+  allMeds: [],     // Master list of all available drugs
+  drugs: [], counts: {}, kpis: {}, submitting: false,
+};
+
+const KPIS_KEYS = ["kpi1","kpi2","kpi3","kpi4"];
+
+// ── Screen control ────────────────────────────────────────────────
+function show(id) {
+  ["screen-login","screen-loading","screen-error","screen-form","screen-success"].forEach(s => {
+    const el = document.getElementById(s);
+    el.hidden = (s !== id);
+    if (s === "screen-form" && s === id) el.style.display = "block";
+  });
+}
+
+function showError(title, body) {
+  document.getElementById("err-title").textContent = title;
+  document.getElementById("err-body").textContent  = body;
+  show("screen-error");
+}
+
+function setLoadMsg(k) { document.getElementById("load-msg").textContent = t(k) || k; }
+
+// ── Login ─────────────────────────────────────────────────────────
+async function doLogin() {
+  const name = document.getElementById("inp-name").value.trim();
+  const pass = document.getElementById("inp-pass").value;
+  const err  = document.getElementById("login-err");
+  const toast= document.getElementById("login-toast");
+  err.style.display = toast.style.display = "none";
+
+  if (!name) { err.textContent = t("err_name_empty"); err.style.display = "block"; return; }
+  if (!pass)  { err.textContent = t("err_pass_empty"); err.style.display = "block"; return; }
+
+  document.getElementById("btn-login").disabled = true;
+  document.getElementById("btn-login").textContent = t("loading");
+
+  try {
+    const hash = await hashPassword(name, pass);
+    const res  = await callGAS("auth", { name, passwordHash: hash });
+
+    if (!res.success) {
+      const msg = {
+        wrong_password:  t("err_wrong_pass"),
+        user_not_found:  t("err_not_found"),
+        account_inactive:t("err_inactive"),
+        name_required:   t("err_name_empty"),
+        password_required:t("err_pass_empty"),
+      }[res.error] || res.error || t("err_network");
+      err.textContent = msg; err.style.display = "block";
+      document.getElementById("btn-login").disabled = false;
+      document.getElementById("btn-login").textContent = t("login_btn");
+      return;
+    }
+
+    if (res.role === "boss") {
+      err.textContent = t("err_not_boss") || "Use boss.html"; err.style.display = "block";
+      document.getElementById("btn-login").disabled = false;
+      document.getElementById("btn-login").textContent = t("login_btn");
+      return;
+    }
+
+    if (res.isNewPassword) {
+      toast.textContent = t("new_pass_toast"); toast.style.display = "block";
+      await new Promise(r => setTimeout(r, 1200));
+    }
+
+    S.session = { name, passwordHash: hash, userId: res.userId, userName: res.userName, wardId: res.wardId };
+    saveSession(S.session);
+    await loadAndRender();
+
+  } catch (e) {
+    err.textContent = t("err_network"); err.style.display = "block";
+    document.getElementById("btn-login").disabled = false;
+    document.getElementById("btn-login").textContent = t("login_btn");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ["inp-name","inp-pass"].forEach(id =>
+    document.getElementById(id).addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); })
+  );
+  
+  const saved = getSession();
+  if (saved?.passwordHash && saved?.wardId) {
+    S.session = saved;
+    loadAndRender();
+  } else {
+    show("screen-login");
+  }
+});
+
+// ── Load data and render form ─────────────────────────────────────
+async function loadAndRender() {
+  show("screen-loading");
+  try {
+    setLoadMsg("loading");
+    S.period = currentPeriod();
+
+    let allLogs = [];
+    try {
+      allLogs = await gviz("LOGS", "SELECT * WHERE B='ASSIGNED'");
+    } catch (e) {
+      console.error('[assignment] gviz failed:', e);
+    }
+
+    if (allLogs.length === 0) {
+      showError(t("error"), "ไม่สามารถอ่านข้อมูลได้ — ตรวจสอบว่า Google Sheet ตั้งค่าเป็น 'Anyone with link → Viewer' แล้ว");
+      return;
+    }
+
+    const uid  = (S.session.userId  || "").trim();
+    const wid  = (S.session.wardId  || "").trim();
+    
+    const myAsn = allLogs.filter(r => {
+      const et  = r["EVENT_TYPE"] || r["B"] || "";
+      const rUid= r["USER_ID"]    || r["F"] || "";
+      return et === "ASSIGNED" && String(rUid).trim() === uid;
+    });
+
+    const asnRow  = myAsn.find(r => (r["PERIOD"] || r["D"]) === S.period) || myAsn[0];
+    const asnWard = asnRow?.["WARD_ID"] || asnRow?.["E"] || wid;
+    const asnId   = asnRow?.["ASSIGNMENT_ID"] || asnRow?.["G"];
+
+    if (!asnId) { showError(t("error"), t("err_no_assign")); return; }
+    
+    S.assignmentId = asnId;
+    S.period       = asnRow["PERIOD"] || asnRow["D"] || S.period;
+    S.auditWard    = asnWard;
+
+    // ── GVIZ Fetch for Autocomplete Datalist ─────────────────────────
+    // This costs ZERO Google Apps Script execution quota!
+    const allMeds = await gviz("MED_ID");
+    S.allMeds = allMeds;
+    
+    const dl = document.getElementById("dl-all-meds");
+    if (dl) {
+      dl.innerHTML = allMeds.map(m => {
+        const id = (m["DRUG_ID"] || m["MED_ID"] || m["A"] || "").toString().trim();
+        const name = (m["DRUG_NAME"] || m["NAME"] || m["B"] || "").toString().trim();
+        if (!id) return "";
+        return `<option value="${id} | ${name}"></option>`;
+      }).join("");
+    }
+    
+    // Start with a completely blank canvas for pure counting
+    S.drugs = [];
+    
+    callGAS("startAudit", { name: S.session.name, passwordHash: S.session.passwordHash, assignmentId: S.assignmentId, period: S.period, wardId: S.auditWard }).catch(() => {});
+
+    renderForm();
+    show("screen-form");
+  } catch (e) {
+    console.error(e);
+    showError(t("error"), t("err_network"));
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderForm() {
+  document.getElementById("hdr-ward").textContent = `${S.auditWard || S.session.wardId} · ${S.period}`;
+
+  const groups = {};
+  S.drugs.forEach(d => { (groups[d.DRUG_CATEGORY] = groups[d.DRUG_CATEGORY]||[]).push(d); });
+
+  const pageBody   = document.querySelector(".page-body");
+  const kpiDivider = pageBody.querySelector(".sec-div");
+
+  // Clear existing items
+  pageBody.querySelectorAll('.cat-section, .btn-add').forEach(el => el.remove());
+
+  Object.entries(groups).forEach(([cat, drugs]) => {
+    const col = CATS[cat]?.color || "#5F6368";
+    const sec = document.createElement("div");
+    sec.className = "cat-section"; sec.dataset.cat = cat;
+    sec.innerHTML = `
+      <div class="cat-header" onclick="this.closest('.cat-section').classList.toggle('collapsed')">
+        <div class="cat-stripe" style="background:${col}"></div>
+        <div class="cat-name">${getCatLabel(cat)}</div>
+        <div class="cat-count">${drugs.length}</div>
+        <div class="cat-chevron">▾</div>
+      </div>
+      <div class="drug-list" id="list-${cat}"></div>
+    `;
+    const list = sec.querySelector(".drug-list");
+    
+    drugs.forEach(drug => {
+      const row = document.createElement("div");
+      row.className = "drug-row";
+      
+      const c = S.counts[drug.DRUG_ID];
+      let val = c !== null && c !== undefined ? c : "";
+
+      row.innerHTML = `
+        <span class="drug-id">${esc(drug.DRUG_ID)}</span>
+        <div class="drug-name">${esc(drug.DRUG_NAME)}</div>
+        <input class="drug-input" type="number" min="0" inputmode="numeric"
+          data-id="${drug.DRUG_ID}" placeholder="ระบุจำนวน" value="${val}" oninput="onCount(this)">
+      `;
+      list.appendChild(row);
+    });
+    pageBody.insertBefore(sec, kpiDivider);
+  });
+
+  // Inject the "Add Item" button
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn-add";
+  addBtn.textContent = "+ เพิ่มรายการยา (Add Medication)";
+  addBtn.onclick = () => {
+    document.getElementById('inp-add-med').value = '';
+    document.getElementById('modal-add').hidden = false;
+  };
+  pageBody.insertBefore(addBtn, kpiDivider);
+
+  // KPIs
+  const kc = document.getElementById("kpi-container");
+  if (kc.innerHTML === "") { // Only render KPIs once
+    const kpiLabels = t("kpis") || [];
+    KPIS_KEYS.forEach((kid, i) => {
+      const kPass = S.kpis[kid];
+      kc.insertAdjacentHTML("beforeend", `
+        <div class="kpi-card ${kPass === false ? 'failed' : ''}" id="kpi-card-${kid}">
+          <div class="kpi-top">
+            <div class="kpi-label">${kpiLabels[i] || kid}</div>
+            <div class="seg">
+              <button class="seg-btn pass ${kPass === true ? 'active' : ''}" onclick="setKpi('${kid}',true,this)">${t("kpi_pass")}</button>
+              <button class="seg-btn fail ${kPass === false ? 'active' : ''}" onclick="setKpi('${kid}',false,this)">${t("kpi_fail")}</button>
+            </div>
+          </div>
+          <textarea class="kpi-note" id="knote-${kid}" placeholder="${t("kpi_note_ph")}"></textarea>
+        </div>
+      `);
+      if (kPass === undefined) S.kpis[kid] = null;
+    });
+  }
+
+  updateStats(); updateSubmitBtn();
+}
+
+// ── Add Item Logic ────────────────────────────────────────────────
+function doAddItem() {
+  const val = document.getElementById("inp-add-med").value.trim();
+  if (!val) return;
+  
+  // Extract ID from the datalist selection format ("ID | Name")
+  const inputStr = val.split('|')[0].trim().toLowerCase();
+  
+  const med = S.allMeds.find(m => {
+    const id = (m["DRUG_ID"] || m["MED_ID"] || m["A"] || "").toString().trim().toLowerCase();
+    const name = (m["DRUG_NAME"] || m["NAME"] || m["B"] || "").toString().trim().toLowerCase();
+    return id === inputStr || name === inputStr || val.toLowerCase() === name;
+  });
+  
+  if (!med) {
+    alert("ไม่พบรหัสยา หรือ ชื่อยานี้ในฐานข้อมูล (Drug not found in master list)");
+    return;
+  }
+  
+  const mId = (med["DRUG_ID"] || med["MED_ID"] || med["A"] || "").toString().trim();
+  
+  // Check if it's already in the list
+  if (S.drugs.some(d => d.DRUG_ID === mId)) {
+    document.getElementById('modal-add').hidden = true;
+    const target = document.querySelector(`input[data-id="${mId}"]`);
+    if (target) { target.scrollIntoView({behavior: "smooth", block: "center"}); target.focus(); }
+    return;
+  }
+  
+  // Add as a new item. Set PAR_QTY to 0 (ignored by UI, just keeps payload compatible)
+  S.drugs.push({
+    DRUG_ID:       mId,
+    DRUG_NAME:     (med["DRUG_NAME"] || med["NAME"] || med["B"] || "Unknown").toString(),
+    DRUG_CATEGORY: (med["DRUG_CATEGORY"] || med["CATEGORY"] || med["C"] || "general").toLowerCase(),
+    UNIT_PRICE:    parseFloat(med["UNIT_PRICE"] ?? med["D"]) || 0,
+    WARD_ID:       S.auditWard,
+    PAR_QTY:       0 
+  });
+  
+  S.counts[mId] = null;
+  
+  document.getElementById('modal-add').hidden = true;
+  renderForm(); // redraw list
+  
+  // Scroll and focus on the newly added input box
+  setTimeout(() => {
+    const target = document.querySelector(`input[data-id="${mId}"]`);
+    if (target) { target.scrollIntoView({behavior: "smooth", block: "center"}); target.focus(); }
+  }, 100);
+}
+
+// ── Interactions ──────────────────────────────────────────────────
+function onCount(input) {
+  const id  = input.dataset.id;
+  if (input.value === "") {
+    S.counts[id] = null;
+  } else {
+    S.counts[id] = parseFloat(input.value);
+  }
+  updateStats(); updateSubmitBtn();
+}
+
+function setKpi(id, pass, btn) {
+  S.kpis[id] = pass;
+  document.getElementById("kpi-card-"+id).querySelectorAll(".seg-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.getElementById("kpi-card-"+id).classList.toggle("failed", !pass);
+  updateSubmitBtn();
+}
+
+function updateStats() {
+  const vals    = S.drugs.map(d => S.counts[d.DRUG_ID]);
+  const counted = vals.filter(v => v !== null).length;
+  const total   = S.drugs.length;
+  
+  document.getElementById("stat-counted").textContent = counted;
+  document.getElementById("stat-total").textContent   = total;
+  
+  const pct = total ? (counted / total) * 100 : 0;
+  document.getElementById("progress").style.width = pct + "%";
+  
+  const rem = total - counted;
+  document.getElementById("sb-main").textContent = rem > 0 ? (t("remaining")(rem)) : t("all_counted");
+}
+
+function updateSubmitBtn() {
+  const allKpi = KPIS_KEYS.every(k => S.kpis[k] !== null);
+  // Need at least one item added AND all added items must have a quantity filled in
+  const hasItems = S.drugs.length > 0;
+  const allItemsCounted = hasItems && S.drugs.every(d => S.counts[d.DRUG_ID] !== null);
+  
+  document.getElementById("sb-sub").textContent = !allKpi ? t("kpi_reminder") : (!hasItems ? "โปรดเพิ่มรายการยาอย่างน้อย 1 รายการ" : t("ready"));
+  document.getElementById("btn-submit").disabled = !(allKpi && allItemsCounted) || S.submitting;
+}
+
+// ── Submit ────────────────────────────────────────────────────────
+async function doSubmit() {
+  if (S.submitting) return;
+  const msg = t("confirm_submit")(S.drugs.length);
+  if (!confirm(msg)) return;
+
+  S.submitting = true;
+  const btn = document.getElementById("btn-submit");
+  btn.disabled = true; btn.textContent = t("submitting_btn");
+
+  try {
+    const items = S.drugs.map(d => ({
+      drugId: d.DRUG_ID, drugCategory: d.DRUG_CATEGORY,
+      parQty: d.PAR_QTY, actualQty: S.counts[d.DRUG_ID],
+    }));
+    const session = {
+      kpi1Pass: S.kpis.kpi1, kpi1Note: document.getElementById("knote-kpi1").value,
+      kpi2Pass: S.kpis.kpi2, kpi2Note: document.getElementById("knote-kpi2").value,
+      kpi3Pass: S.kpis.kpi3, kpi3Note: document.getElementById("knote-kpi3").value,
+      kpi4Pass: S.kpis.kpi4, kpi4Note: document.getElementById("knote-kpi4").value,
+      narcoticNotes:  document.getElementById("note-narcotic").value,
+      coldChainNotes: document.getElementById("note-cold").value,
+      otherNotes:     document.getElementById("note-other").value,
+    };
+    const res = await callGAS("submitAudit", {
+      name: S.session.name, passwordHash: S.session.passwordHash,
+      assignmentId: S.assignmentId, items, session
+    });
+    if (!res.success) throw new Error(res.error || t("err_network"));
+
+    document.getElementById("success-sub").textContent  = `${S.auditWard || S.session.wardId} · ${S.period} · ${items.length} items`;
+    document.getElementById("success-session").textContent = res.sessionId;
+    clearSession();
+    show("screen-success");
+  } catch (e) {
+    S.submitting = false;
+    btn.disabled = false; btn.textContent = t("submit_btn");
+    alert(e.message || t("err_network"));
+  }
+}
+
+// ── i18n ──────────────────────────────────────────────────────────
+function applyLang() {
+  applyI18nAttrs();
+  if (!document.getElementById("screen-form").hidden) {
+    const labels = t("kpis") || [];
+    KPIS_KEYS.forEach((kid, i) => {
+      const el = document.querySelector(`#kpi-card-${kid} .kpi-label`);
+      if (el && labels[i]) el.textContent = labels[i];
+      const pass = document.querySelector(`#kpi-card-${kid} .seg-btn.pass`);
+      const fail = document.querySelector(`#kpi-card-${kid} .seg-btn.fail`);
+      if (pass) pass.textContent = t("kpi_pass");
+      if (fail) fail.textContent = t("kpi_fail");
+    });
+    document.querySelectorAll(".cat-section").forEach(sec => {
+      const nameEl = sec.querySelector(".cat-name");
+      if (nameEl) nameEl.textContent = getCatLabel(sec.dataset.cat);
+    });
+  }
+}
+</script>
+</body>
+</html>
