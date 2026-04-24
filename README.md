@@ -1,4 +1,4 @@
-# StockWard — ระบบตรวจสอบยาคงคลัง
+# StockWard ระบบตรวจสอบยา
 
 Excited to share a system that's quietly transforming how 50+ healthcare professionals audit medication inventory across an entire hospital. 🚀
 
