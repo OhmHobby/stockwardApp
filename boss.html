@@ -910,8 +910,12 @@
             <canvas id="chart-bar"></canvas>
           </div>
           <div class="chart-card">
-            <div class="chart-lbl" id="pie-lbl" data-i18n="chart_pie">
-              สัดส่วน
+            <div class="chart-lbl" style="display:flex;align-items:center;justify-content:space-between">
+              <span id="pie-lbl" data-i18n="chart_pie">สัดส่วน</span>
+              <div class="seg" style="font-size:.72rem">
+                <button class="seg-btn active" id="pie-tog-par"  onclick="setPieSrc('par')" >PAR</button>
+                <button class="seg-btn"        id="pie-tog-act"  onclick="setPieSrc('act')" >นับได้</button>
+              </div>
             </div>
             <canvas id="chart-pie"></canvas>
           </div>
@@ -1039,9 +1043,10 @@
     <script>
       // ── Boss state ────────────────────────────────────────────────────
       let BS = {
-        session: null, // { name, passwordHash, userId, userName }
+        session: null,
         period: currentPeriod(),
         metric: 'qty',
+        pieSrc: 'par',
         drugs: [],
         logs: [],
         wards: [],
@@ -1444,13 +1449,52 @@
           BS.drugs = [];
         }
       }
+      // ── Timestamp parser — handles both formats gviz returns ──────────
+      function parseTimestamp(ts) {
+        if (!ts) return null;
+        // gviz datetime format: Date(2026,3,27,12,49,14) — month is 0-indexed
+        const gd = ts.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+)(?:,(\d+))?)?\)/);
+        if (gd) return new Date(+gd[1], +gd[2], +gd[3], +(gd[4]||0), +(gd[5]||0), +(gd[6]||0));
+        // Manual format: "27/04/2026 13:02:56"
+        const m = ts.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4]||0), +(m[5]||0), +(m[6]||0));
+        return null;
+      }
+
+      // Returns true if a timestamp string falls within a given "YYYY-MM" period
+      function tsInPeriod(ts, period) {
+        const d = parseTimestamp(ts);
+        if (!d) return false;
+        const [py, pm] = period.split('-').map(Number);
+        return d.getFullYear() === py && (d.getMonth() + 1) === pm;
+      }
+
+      // Returns true if a timestamp string is today
+      function tsIsToday(ts) {
+        const d = parseTimestamp(ts);
+        if (!d) return false;
+        const now = new Date();
+        return d.getFullYear() === now.getFullYear() &&
+               d.getMonth()    === now.getMonth()    &&
+               d.getDate()     === now.getDate();
+      }
+
       async function loadLogs() {
         try {
+          // Fetch all relevant event types with NO timestamp filter.
+          // ASSIGNED rows can be from any date (boss assigns ahead of time),
+          // so filtering them by timestamp would drop them before STARTED/SUBMITTED
+          // can be linked. renderOverview handles period scoping instead.
           BS.logs = await gviz(
             'LOGS',
-            `SELECT A,B,C,D,E,F,G,H,I,J,K,L,O,P,Q,R WHERE D='${BS.period}'`,
+            `SELECT A,B,C,D,E,F,G,H,I,J,K,L,O,P,Q,R WHERE B='ASSIGNED' OR B='STARTED' OR B='SUBMITTED_SESSION' OR B='CANCELLED'`,
           );
+          console.log(`[loadLogs] fetched ${BS.logs.length} rows`);
+          BS.logs.forEach((r,i) => console.log(
+            `  [${i}] ${r['EVENT_TYPE']||r['B']} | ts=${r['TIMESTAMP']||r['C']} | ward=${r['WARD_ID']||r['E']} | uid=${r['USER_ID']||r['F']} | asnId=${r['ASSIGNMENT_ID']||r['G']}`
+          ));
         } catch (e) {
+          console.error('[loadLogs] error:', e);
           BS.logs = [];
         }
       }
@@ -1458,82 +1502,132 @@
       // ── Overview ──────────────────────────────────────────────────────
       function renderOverview() {
         const el = document.getElementById('ov-content');
-        const wm = {};
+
+        // Group logs by ASSIGNMENT_ID. Logs are oldest→newest top-to-bottom,
+        // so the LAST entry per assignment = current status.
+        const am = {};
         BS.logs.forEach((r) => {
-          const wid = r['WARD_ID'] || r['E'] || '',
-            et  = r['EVENT_TYPE'] || r['B'] || '';
-          if (!wid) return;
-          if (!wm[wid])
-            wm[wid] = {
-              wardId: wid,
-              assigned: null,
-              started: null,
-              submitted: null,
-              kpis: null,
-              cancelled: false,
-            };
-          const ts  = r['TIMESTAMP'] || r['C'] || '';
-          if (et === 'CANCELLED')          { wm[wid].cancelled = true; return; }
-          if (et === 'ASSIGNED')           { wm[wid].cancelled = false; wm[wid].assigned = ts; }
-          if (et === 'STARTED' && !wm[wid].started) wm[wid].started = ts;
-          if (et === 'SUBMITTED_SESSION' && !wm[wid].submitted) {
-            wm[wid].submitted = ts;
-            wm[wid].kpis = [r['KPI1_PASS']??r['O'], r['KPI2_PASS']??r['P'], r['KPI3_PASS']??r['Q'], r['KPI4_PASS']??r['R']];
+          const et  = r['EVENT_TYPE']    || r['B'] || '';
+          const aId = r['ASSIGNMENT_ID'] || r['G'] || '';
+          const wid = r['WARD_ID']       || r['E'] || '';
+          const uid = r['USER_ID']       || r['F'] || '';
+          const ts  = r['TIMESTAMP']     || r['C'] || '';
+          if (!aId || !wid) return;
+
+          if (!am[aId]) am[aId] = {
+            assignmentId:  aId,
+            wardId:        wid,
+            userId:        uid,
+            assignedTs:    null,
+            assignedToday: false,
+            latestStatus:  null,
+            latestTs:      null,
+            sessions:      new Map(), // sessionId → { ts, kpis }
+          };
+
+          // Always overwrite — last row wins = newest status
+          am[aId].latestStatus = et;
+          am[aId].latestTs     = ts;
+
+          if (et === 'ASSIGNED') {
+            am[aId].assignedTs    = ts;
+            am[aId].assignedToday = tsIsToday(ts);
+          }
+          if (et === 'SUBMITTED_SESSION') {
+            const sid = r['SESSION_ID'] || r['H'] || '';
+            if (sid) am[aId].sessions.set(sid, {
+              sid,
+              ts,
+              kpis: [r['KPI1_PASS']??r['O'], r['KPI2_PASS']??r['P'], r['KPI3_PASS']??r['Q'], r['KPI4_PASS']??r['R']]
+            });
           }
         });
-        // Remove cancelled wards that were never re-assigned after cancellation
-        Object.keys(wm).forEach((k) => { if (wm[k].cancelled) delete wm[k]; });
-        if (!Object.keys(wm).length) {
+
+        // Only show assignments created today
+        const cards = Object.values(am).filter(a => a.assignedToday);
+
+        const today = new Date();
+        const todayStr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
+        console.group('[renderOverview]');
+        console.log('today:', todayStr);
+        console.log('raw logs fetched:', BS.logs.length);
+        console.log('unique assignments:', Object.keys(am).length);
+        Object.values(am).forEach(a => console.log(
+          `${a.assignedToday ? 'SHOW' : 'SKIP'} | asnId=${a.assignmentId} | ward=${a.wardId} | status=${a.latestStatus} | assignedTs=${a.assignedTs}`
+        ));
+        console.log('cards to display:', cards.length);
+        console.groupEnd();
+
+        if (!cards.length) {
           el.innerHTML = `<p style="color:var(--muted);padding:1.5rem 0;font-size:.875rem">${t('ov_no_data')}</p>`;
           return;
         }
-        const st = (w) =>
-          w.submitted ? 'submitted' : w.started ? 'in_progress' : 'pending';
-        const lbl = (s) =>
-          s === 'submitted'
-            ? t('status_done')
-            : s === 'in_progress'
-              ? t('status_prog')
-              : t('status_pending');
-        const fmts = (ts) =>
-          ts
-            ? new Date(ts).toLocaleString('th-TH', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : '—';
+
+        // Status → style mapping
+        // ASSIGNED  = waiting  → yellow
+        // STARTED   = working  → green
+        // SUBMITTED_SESSION = done → gray
+        const statusMap = {
+          'ASSIGNED':          { cls: 'in_progress', badge: 'badge-progress', label: t('status_pending') },
+          'STARTED':           { cls: 'submitted',   badge: 'badge-submitted', label: t('status_prog')   },
+          'SUBMITTED_SESSION': { cls: 'pending',     badge: 'badge-pending',  label: t('status_done')   },
+        };
+
+        const fmts = (ts) => {
+          const d = parseTimestamp(ts);
+          return d ? d.toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+        };
+
+        const userName = (uid) => {
+          const u = BS.users.find(u => (u.userId || u['USER_ID'] || '') === uid);
+          return u ? (u.name || u['NAME'] || uid) : uid;
+        };
+
         let html = `<div class="ward-grid">`;
-        Object.values(wm).forEach((w) => {
-          const s = st(w);
-          const kpis = w.kpis
-            ? w.kpis
-                .map(
-                  (v, i) =>
-                    `<div class="kpip" style="background:${v ? 'var(--success)' : 'var(--danger)'}" title="KPI${i + 1}"></div>`,
-                )
-                .join('')
+        cards.forEach((w) => {
+          const sm = statusMap[w.latestStatus] || statusMap['ASSIGNED'];
+
+          const sessionsHtml = w.sessions.size > 0
+            ? `<div style="margin-top:.5rem;${w.sessions.size > 2 ? 'max-height:116px;overflow-y:auto;' : ''}">` +
+              [...w.sessions.values()].map(s => {
+                const kpiDots = s.kpis.map((v, i) =>
+                  `<div class="kpip" style="background:${v ? 'var(--success)' : 'var(--danger)'}" title="KPI${i+1}"></div>`
+                ).join('');
+                return `<div onclick="viewSession('${esc(s.sid)}','${esc(w.wardId)}')"
+                  style="display:flex;align-items:center;gap:.5rem;padding:.35rem .4rem;border-top:1px solid var(--divider);font-size:.72rem;color:var(--muted);cursor:pointer;border-radius:4px;transition:background .15s"
+                  onmouseover="this.style.background='var(--divider)'" onmouseout="this.style.background='transparent'">
+                  <span style="font-family:'Roboto Mono',monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.sid)}</span>
+                  <span style="white-space:nowrap">${fmts(s.ts)}</span>
+                  <div style="display:flex;gap:.2rem;flex-shrink:0">${kpiDots}</div>
+                </div>`;
+              }).join('') + `</div>`
             : '';
-          html += `<div class="ward-card ${s}"><div class="wc-top"><div class="wc-id">${esc(w.wardId)}</div><span class="badge badge-${s}">${lbl(s)}</span></div>
-      ${kpis ? `<div class="wc-kpis">${kpis}</div>` : ''}
-      <div class="wc-ts">${t('ts_assigned')}: ${fmts(w.assigned)}</div>
-      ${w.started ? `<div class="wc-ts">${t('ts_started')}: ${fmts(w.started)}</div>` : ''}
-      ${w.submitted ? `<div class="wc-ts">${t('ts_submitted')}: ${fmts(w.submitted)}</div>` : ''}
-    </div>`;
+
+          html += `<div class="ward-card ${sm.cls}">
+            <div class="wc-top">
+              <div class="wc-id">${esc(w.wardId)}</div>
+              <span class="badge ${sm.badge}">${sm.label}</span>
+            </div>
+            <div class="wc-ts" style="font-size:.72rem;color:var(--muted);margin-top:.2rem">👤 ${esc(userName(w.userId))}</div>
+            <div class="wc-ts">มอบหมาย: ${fmts(w.assignedTs)}</div>
+            ${w.latestStatus !== 'ASSIGNED' ? `<div class="wc-ts">ล่าสุด: ${fmts(w.latestTs)}</div>` : ''}
+            ${sessionsHtml}
+          </div>`;
         });
         el.innerHTML = html + `</div>`;
       }
-
       // ── Reports ───────────────────────────────────────────────────────
       function setMetric(m) {
         BS.metric = m;
-        document
-          .getElementById('tog-qty')
-          .classList.toggle('active', m === 'qty');
-        document
-          .getElementById('tog-value')
-          .classList.toggle('active', m === 'value');
+        document.getElementById('tog-qty').classList.toggle('active', m === 'qty');
+        document.getElementById('tog-value').classList.toggle('active', m === 'value');
+        renderReports();
+      }
+
+      function setPieSrc(src) {
+        BS.pieSrc = src;
+        document.getElementById('pie-tog-par').classList.toggle('active', src === 'par');
+        document.getElementById('pie-tog-act').classList.toggle('active', src === 'act');
         renderReports();
       }
 
@@ -1621,7 +1715,7 @@
             labels,
             datasets: [
               {
-                data: parArr,          // PAR is always populated; actArr is 0 until submitted
+                data: BS.pieSrc === 'act' ? actArr : parArr,
                 backgroundColor: colors.map((c) => c + 'BB'),
                 borderColor: '#fff',
                 borderWidth: 2,
@@ -1754,26 +1848,61 @@
           el.innerHTML = `<p style="color:var(--muted);font-size:.875rem">${t('ov_no_data')}</p>`;
           return;
         }
+
+        // Build today's assignment status per userId from logs
+        // Same logic as renderOverview: group by assignmentId, last row = status, only if ASSIGNED today
+        const todayAsn = {}; // userId → { ward, status }
+        const am = {};
+        BS.logs.forEach((r) => {
+          const et  = r['EVENT_TYPE']    || r['B'] || '';
+          const aId = r['ASSIGNMENT_ID'] || r['G'] || '';
+          const wid = r['WARD_ID']       || r['E'] || '';
+          const uid = r['USER_ID']       || r['F'] || '';
+          const ts  = r['TIMESTAMP']     || r['C'] || '';
+          if (!aId || !wid || !uid) return;
+          if (!am[aId]) am[aId] = { wardId: wid, userId: uid, assignedToday: false, latestStatus: null };
+          am[aId].latestStatus = et;
+          if (et === 'ASSIGNED' && tsIsToday(ts)) am[aId].assignedToday = true;
+        });
+        Object.values(am).forEach(a => {
+          if (!a.assignedToday) return;
+          // If user has multiple assignments today, last one wins
+          todayAsn[a.userId] = { ward: a.wardId, status: a.latestStatus };
+        });
+
+        const statusBadge = {
+          ASSIGNED:          `<span class="badge badge-progress">รอดำเนินการ</span>`,
+          STARTED:           `<span class="badge badge-submitted">กำลังทำงาน</span>`,
+          SUBMITTED_SESSION: `<span class="badge badge-pending">ส่งแล้ว</span>`,
+        };
+
         let html = '';
         BS.users.forEach((u) => {
-          const uid  = u.userId  || u['USER_ID'] || '',
-            name = u.name    || u['NAME']    || '—',
-            role = u.role    || u['ROLE']    || 'worker',
-            ward = u.wardId  || u['WARD_ID'] || '—';
+          const uid  = u.userId  || u['USER_ID'] || '';
+          const name = u.name    || u['NAME']    || '—';
+          const role = u.role    || u['ROLE']    || 'worker';
+          const homeWard = u.wardId || u['WARD_ID'] || '—';
+          const asn  = todayAsn[uid];
+          const asnBadge = (role === 'worker' && asn) ? (statusBadge[asn.status] || '') : '';
+          const asnWard  = (role === 'worker' && asn) ? `→ <b>${asn.ward}</b>` : '';
+
           html += `<div class="user-row">
-      <div class="user-info">
-        <div class="user-name">${esc(name)} <span class="badge ${role === 'boss' ? 'badge-submitted' : 'badge-pending'}" style="font-size:.65rem">${role}</span></div>
-        <div class="user-meta">${uid} · ${ward}</div>
-      </div>
-      <div class="user-actions">
-        <button class="btn btn-warn   btn-sm" onclick="resetPass('${uid}',this)" title="${t('ul_reset_pass')}">🔓</button>
-        <button class="btn btn-danger btn-sm" onclick="deactivate('${uid}',this)"title="${t('ul_deact')}">✕</button>
-      </div>
-    </div>`;
+            <div class="user-info">
+              <div class="user-name">
+                ${esc(name)}
+                <span class="badge ${role === 'boss' ? 'badge-submitted' : 'badge-pending'}" style="font-size:.65rem">${role}</span>
+                ${asnBadge}
+              </div>
+              <div class="user-meta">${uid} · ${homeWard} ${asnWard}</div>
+            </div>
+            <div class="user-actions">
+              <button class="btn btn-warn   btn-sm" onclick="resetPass('${uid}',this)" title="${t('ul_reset_pass')}">🔓</button>
+              <button class="btn btn-danger btn-sm" onclick="deactivate('${uid}',this)" title="${t('ul_deact')}">✕</button>
+            </div>
+          </div>`;
         });
         el.innerHTML = html;
       }
-
       function onRoleChange() {
         document.getElementById('new-ward-grp').style.display =
           document.getElementById('new-role').value === 'boss' ? 'none' : '';
@@ -1931,5 +2060,87 @@
         }
       }
     </script>
+
+  <!-- ── Session Detail Modal ──────────────────────────────────────── -->
+  <div id="session-modal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:1rem">
+    <div style="background:var(--surface);border-radius:12px;width:100%;max-width:560px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.2)">
+      <div style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="flex:1">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.95rem" id="sm-title">Session</div>
+          <div style="font-family:'Roboto Mono',monospace;font-size:.72rem;color:var(--muted);margin-top:.15rem" id="sm-sid">—</div>
+        </div>
+        <button onclick="closeSessionModal()" style="background:transparent;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);line-height:1">✕</button>
+      </div>
+      <div id="sm-body" style="overflow-y:auto;flex:1;padding:1rem 1.25rem">
+        <div style="display:flex;align-items:center;gap:.65rem;color:var(--muted);font-size:.875rem"><div class="spinner"></div> กำลังโหลด...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function viewSession(sid, wardId) {
+      const modal = document.getElementById('session-modal');
+      modal.style.display = 'flex';
+      document.getElementById('sm-title').textContent = wardId || 'Session';
+      document.getElementById('sm-sid').textContent   = sid;
+      document.getElementById('sm-body').innerHTML    = `<div style="display:flex;align-items:center;gap:.65rem;color:var(--muted);font-size:.875rem"><div class="spinner"></div> กำลังโหลด...</div>`;
+
+      try {
+        const rows = await gviz('LOGS',
+          `SELECT I,J,K,L,M,N WHERE B='SUBMITTED_ITEM' AND H='${sid}'`
+        );
+
+        if (!rows.length) {
+          document.getElementById('sm-body').innerHTML =
+            `<p style="color:var(--muted);font-size:.875rem">ไม่มีรายการยาในเซสชันนี้</p>`;
+          return;
+        }
+
+        let html = `<table style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead><tr style="background:var(--divider)">
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600">Drug ID</th>
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600">Category</th>
+            <th style="text-align:right;padding:.4rem .6rem;font-weight:600">PAR</th>
+            <th style="text-align:right;padding:.4rem .6rem;font-weight:600">นับได้</th>
+            <th style="text-align:right;padding:.4rem .6rem;font-weight:600">Δ</th>
+            <th style="text-align:center;padding:.4rem .6rem;font-weight:600">สถานะ</th>
+          </tr></thead><tbody>`;
+
+        rows.forEach((r, i) => {
+          const drugId   = r['DRUG_ID']          || r['I'] || '—';
+          const cat      = r['DRUG_CATEGORY']     || r['J'] || '—';
+          const par      = r['PAR_QTY']           ?? r['K'];
+          const act      = r['ACTUAL_QTY']        ?? r['L'];
+          const variance = r['VARIANCE']          ?? r['M'];
+          const vstatus  = r['VARIANCE_STATUS']   || r['N'] || '';
+          const vc = vstatus === 'OVER'  ? 'color:var(--warning)' :
+                     vstatus === 'SHORT' ? 'color:var(--danger)'  :
+                     vstatus === 'MATCH' ? 'color:var(--success)' : '';
+          html += `<tr style="border-bottom:1px solid var(--divider);background:${i%2?'var(--divider)':'transparent'}">
+            <td style="padding:.4rem .6rem;font-family:'Roboto Mono',monospace;font-size:.72rem">${esc(drugId)}</td>
+            <td style="padding:.4rem .6rem">${esc(cat)}</td>
+            <td style="padding:.4rem .6rem;text-align:right">${par ?? '—'}</td>
+            <td style="padding:.4rem .6rem;text-align:right;font-weight:600">${act ?? '—'}</td>
+            <td style="padding:.4rem .6rem;text-align:right;${vc}">${variance != null ? (variance > 0 ? '+' : '') + variance : '—'}</td>
+            <td style="padding:.4rem .6rem;text-align:center;font-size:.72rem;${vc}">${vstatus || '—'}</td>
+          </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById('sm-body').innerHTML = html;
+      } catch (e) {
+        document.getElementById('sm-body').innerHTML =
+          `<p style="color:var(--danger);font-size:.875rem">โหลดข้อมูลไม่ได้: ${e.message}</p>`;
+      }
+    }
+
+    function closeSessionModal() {
+      document.getElementById('session-modal').style.display = 'none';
+    }
+    // Close on backdrop click
+    document.getElementById('session-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeSessionModal();
+    });
+  </script>
   </body>
 </html>

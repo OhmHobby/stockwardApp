@@ -7,7 +7,7 @@
 const CONFIG = {
   // Your GAS Web App deployment URL
   GAS_URL:
-    'https://script.google.com/macros/s/AKfycbx68ZfBR8uI0472Ngu3SC8LUjd_0c0T0Ur9oMEzBujrfMruZKkQ374TtzzRGj-_bs-UuA/exec',
+    'https://script.google.com/macros/s/AKfycbzneVPjt6XkDaJVp_02KjvN5Y0newjsqH1UT1PhLKYI3lyeDUAtbMN7Ta5vI_q5ZKlTSA/exec',
 
   // The long ID in your Google Sheets URL (between /d/ and /edit)
   SPREADSHEET_ID: '1GPQC9QVNk1SPQub1xWzag7DKg_MCSFZSSRZ7HaoM748',

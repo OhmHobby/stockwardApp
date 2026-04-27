@@ -445,7 +445,8 @@ async function loadAndRender() {
 
     let allLogs = [];
     try {
-      allLogs = await gviz("LOGS", "SELECT * WHERE B='ASSIGNED'");
+      // Fetch both ASSIGNED and SUBMITTED_SESSION so we can exclude completed ones
+      allLogs = await gviz("LOGS", "SELECT * WHERE B='ASSIGNED' OR B='SUBMITTED_SESSION'");
     } catch (e) {
       console.error('[assignment] gviz failed:', e);
     }
@@ -457,21 +458,54 @@ async function loadAndRender() {
 
     const uid  = (S.session.userId  || "").trim();
     const wid  = (S.session.wardId  || "").trim();
-    
-    const myAsn = allLogs.filter(r => {
-      const et  = r["EVENT_TYPE"] || r["B"] || "";
-      const rUid= r["USER_ID"]    || r["F"] || "";
-      return et === "ASSIGNED" && String(rUid).trim() === uid;
-    });
 
-    const asnRow  = myAsn.find(r => (r["PERIOD"] || r["D"]) === S.period) || myAsn[0];
+    // Build a set of assignment IDs already submitted by this user
+    const submittedIds = new Set(
+      allLogs
+        .filter(r => {
+          const et   = r["EVENT_TYPE"] || r["B"] || "";
+          const rUid = r["USER_ID"]    || r["F"] || "";
+          return et === "SUBMITTED_SESSION" && String(rUid).trim() === uid;
+        })
+        .map(r => (r["ASSIGNMENT_ID"] || r["G"] || "").toString().trim())
+        .filter(Boolean)
+    );
+
+    // Read ASSIGNED rows bottom-to-top (newest first) and skip submitted ones
+    const myAsn = allLogs
+      .filter(r => {
+        const et   = r["EVENT_TYPE"] || r["B"] || "";
+        const rUid = r["USER_ID"]    || r["F"] || "";
+        return et === "ASSIGNED" && String(rUid).trim() === uid;
+      })
+      .reverse(); // bottom-to-top = most recent first
+
+    const asnRow = myAsn.find(r => {
+      const id = (r["ASSIGNMENT_ID"] || r["G"] || "").toString().trim();
+      return id && !submittedIds.has(id);
+    }) || myAsn[0]; // fallback: most recent even if submitted (shouldn't normally happen)
+
     const asnWard = asnRow?.["WARD_ID"] || asnRow?.["E"] || wid;
     const asnId   = asnRow?.["ASSIGNMENT_ID"] || asnRow?.["G"];
 
     if (!asnId) { showError(t("error"), t("err_no_assign")); return; }
-    
+
+    // Normalize whatever PERIOD format gviz returns into YYYY-MM
+    function normalizePeriod(raw) {
+      if (!raw) return null;
+      // Date(2026,3,1) — month is 0-indexed
+      const gd = String(raw).match(/^Date\((\d+),(\d+)/);
+      if (gd) return `${gd[1]}-${String(+gd[2] + 1).padStart(2, '0')}`;
+      // DD/MM/YYYY
+      const dmy = String(raw).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (dmy) return `${dmy[3]}-${dmy[2]}`;
+      // Already YYYY-MM
+      if (/^\d{4}-\d{2}$/.test(String(raw))) return String(raw);
+      return null;
+    }
+
     S.assignmentId = asnId;
-    S.period       = asnRow["PERIOD"] || asnRow["D"] || S.period;
+    S.period       = normalizePeriod(asnRow["PERIOD"] || asnRow["D"]) || S.period;
     S.auditWard    = asnWard;
 
     // ── GVIZ Fetch for Autocomplete Datalist ─────────────────────────
@@ -704,7 +738,7 @@ async function doSubmit() {
     };
     const res = await callGAS("submitAudit", {
       name: S.session.name, passwordHash: S.session.passwordHash,
-      assignmentId: S.assignmentId, items, session
+      assignmentId: S.assignmentId, wardId: S.auditWard, items, session
     });
     if (!res.success) throw new Error(res.error || t("err_network"));
 

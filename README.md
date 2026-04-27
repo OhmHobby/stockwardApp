@@ -1,123 +1,107 @@
-# StockWard ระบบตรวจสอบยา
+# StockWard — ระบบตรวจสอบยา
 
-Excited to share a system that's quietly transforming how 50+ healthcare professionals audit medication inventory across an entire hospital. 🚀
+A medication audit system for a hospital. Built around what was already there — Google Sheets, Apps Script, GitHub Pages — because the right tool is the one that fits the problem, not the one on the enterprise price list.
 
-No servers. No licensing fees. No vendor lock-in. Just Google Sheets, a sprinkle of Apps Script, and GitHub Pages doing what enterprise software charges six figures to do.
+Zero cost. Low maintenance. The pharmacist asked if it could link to their existing Sheets. It could. That was the architecture.
 
-The stack? Brutally simple. Reads hit Google Sheets directly via gviz (zero backend cost). Writes go through Google Apps Script. The whole thing lives on GitHub Pages for free. Some would call it scrappy. I call it **efficient**.
-
-Here is the **Main Link** Btw UwU :
-https://OhmHobby.github.io/stockwardApp/index.html
+**Main Link:**
+ https://OhmHobby.github.io/stockwardApp/index.html
 
 ---
 
-## 🏗️ The Architecture — or: How We Built a Hospital System on Vibes and Free Tiers
+## How It Works
 
-Let me tell you something. When people say "you need a proper backend," what they really mean is "I want something familiar." But familiar isn't always right.
-
-StockWard runs a full medication audit cycle for an entire hospital using three things you already have a Google account for. Here's how it actually works.
-
----
-
-### The Big Picture
+Think of it like a kitchen with one rule: no new appliances. You figure out what the existing tools can actually do... and it turns out a good knife, a pan, and knowing your stove covers 95% of everything. The "free tier" isn't the compromise here. It's the design.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        THE USER                                  │
-│              (50 workers on their phones +                       │
-│               pharmacists on their laptops)                      │
+│                  (workers + boss, on any device)                 │
 └────────────────────────┬────────────────────────────────────────┘
                          │  opens a URL
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   GITHUB PAGES                                   │
-│              (Frontend — index / worker / boss)                  │
+│         (index / worker / boss ... pure HTML + JS)               │
 │                                                                  │
-│   Pure HTML + CSS + Vanilla JS. No React. No build step.        │
-│   Deploys on git push. Costs exactly $0.00/month.               │
+│   No framework. No build step. git push = deployed.             │
 └──────────┬──────────────────────────────┬───────────────────────┘
            │                              │
      READS (gviz)                   WRITES (fetch POST)
+     free, direct,                  validated, logged,
+     no quota burned                goes through GAS
            │                              │
            ▼                              ▼
 ┌──────────────────────┐    ┌─────────────────────────────────────┐
 │   GOOGLE SHEETS      │    │        GOOGLE APPS SCRIPT           │
-│   (The Database)     │    │        (The Backend)                 │
+│   (the database)     │◄───│        (the backend)                 │
 │                      │    │                                      │
-│  • USERS             │    │  Deployed as a Web App.             │
-│  • WARD_ID           │    │  Handles auth, writes, assignments. │
-│  • MED_ID            │◄───│  Validates keys, hashes passwords.  │
-│  • MED+WARD_PAR      │    │  Returns JSON. That's it.           │
-│  • MED+WARD          │    │                                      │
-│  • LOGS              │    └─────────────────────────────────────┘
-│                      │
-│  Shared as "Anyone   │
-│  can view" so the    │
-│  frontend can read   │
-│  directly — no API   │
-│  call needed.        │
+│  USERS · WARD_ID     │    │  One URL. POST in, JSON out.        │
+│  MED_ID · LOGS       │    │  Auth, validate, write. That's it.  │
+│  MED+WARD_PAR        │    └─────────────────────────────────────┘
+│  MED+WARD            │
 └──────────────────────┘
+  Set to "Anyone can view"
+  so the frontend reads it
+  like a free JSON API ...
+  no server, no quota.
 ```
 
-Three layers. No Docker. No EC2. No monthly bill that makes you cry.
+Reads and writes have completely different needs. Reads need to be fast and free. Writes need to be safe and logged. So they take different paths — reads go straight from the browser to Google Sheets via `gviz` (a read endpoint that's been quietly sitting there the whole time). Writes go through Apps Script. Once you split them like that, the whole thing just... clicks.
 
 ---
 
-### Layer 1 — The Frontend (GitHub Pages)
-
-This is your classic static site. Three HTML files, two JS files, zero frameworks.
+## The Files
 
 ```
-index.html   →  Role picker. Are you a worker or the boss?
-worker.html  →  The counting form. This is what 50 people open every audit cycle.
-boss.html    →  The pharmacist's cockpit. Charts, reports, team management.
+index.html   ...  pick your role and go
+worker.html  ...  the audit form
+boss.html    ...  overview, reports, team
 
-js/config.js →  GAS URL + Spreadsheet ID. The only thing you change per deployment.
-js/lang.js   →  Full Thai/English i18n. Because the workers speak Thai and the
-                 pharmacist sometimes doesn't.
+js/config.js ...  the only file you change per deployment (literally two values)
+js/lang.js   ...  Thai/English, because not everyone in the hospital speaks the same language
 ```
 
-GitHub Pages serves all of this for free, globally, with SSL. The whole "frontend infrastructure" story ends there.
-
-**Why no framework?** Because 50 hospital workers opening a URL on their phone don't need a 200kb React bundle. They need a form that loads fast on hospital WiFi. Vanilla JS loads in milliseconds. Done.
+No framework, because the users open this on whatever device they have on whatever WiFi is left after the medical equipment takes its share. Fast load is a feature. Vanilla JS delivers it.
 
 ---
 
-### Layer 2 — Google Apps Script (The Backend That Isn't a Backend)
+## Secret Sauce
 
-GAS is deployed as a Web App with a single public URL. Every write operation in the system is a `POST` to that URL with a JSON body.
+**Reads bypass the backend entirely.** `gviz` is Google's own query endpoint for public Sheets. The browser calls it directly — no GAS execution, no quota burn, no latency from a middleman. The boss can refresh the dashboard all day. Costs nothing.
+
+**Writes are the only thing GAS touches** ... and that's appropriate, because writes are the only thing that needs to be validated, authenticated, and logged.
+
+**The spreadsheet IS the database.** Not a cache of it, not a mirror. The actual database. When a worker submits a count, Apps Script appends rows to LOGS. A SUMIF formula in MED+WARD reads those rows and recalculates automatically. No sync job. No cache to invalidate. Sheets just does it.
+
+**LOGS is an event log.** Every action is a row: `ASSIGNED`, `STARTED`, `SUBMITTED_SESSION`, `SUBMITTED_ITEM`. The frontend reconstructs current state by grouping rows on `ASSIGNMENT_ID`, reading bottom-to-top (newest last, so reverse first), and taking the last event as the current status. It's event sourcing on a spreadsheet and it works embarrassingly well.
+
+---
+
+## Auth
+
+Name-salted SHA-256:
 
 ```
-Worker submits audit  →  POST { action: "submitAudit", items: [...], session: {...} }
-Boss creates user     →  POST { action: "createUser", name: "...", role: "..." }
-Worker logs in        →  POST { action: "auth", name: "...", passwordHash: "..." }
+hash = SHA-256( name.toLowerCase() + ":" + password )
 ```
 
-GAS receives the request, validates the key, does its thing, appends rows to Google Sheets, and returns `{ success: true }`. No database driver. No ORM. No migrations. The spreadsheet IS the database.
+Same password, different name = different hash. First login saves it. Every login after compares it. Not OAuth. Not JWT. But security is about matching the lock to the door... not putting a vault door on a broom closet.
 
-**Auth works like this:**
+---
 
-```
-Password never travels in plaintext.
-Hash = SHA-256( name.toLowerCase() + ":" + password )
-The name is the salt. Same password, different names = different hashes.
-First login? Hash gets saved to the USERS sheet. That's your registration.
-Second login? Hash compared. Match = welcome back.
-```
+## Retry Logic
 
-It's not OAuth. It's not JWT. It's name-salted SHA-256 stored in a spreadsheet cell. For a hospital pharmacy audit tool with a budget measured in milkshakes, it's exactly enough.
-
-**Retry logic with exponential backoff** is baked into every GAS call because Apps Script cold starts are a thing and nobody likes a spinner that just sits there forever:
+GAS cold starts are real — if nobody's touched the deployment in a while, the first request catches it mid-warmup. Every call retries up to 6 times with exponential backoff and jitter:
 
 ```javascript
-// Simplified — actual code lives in config.js
 async function callGAS(action, data, attempt = 0) {
   try {
     const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action, ...data }) });
     const json = await res.json();
     if (json.retryable && attempt < 6) {
-      await sleep(800 * 2 ** attempt + randomJitter);
-      return callGAS(action, data, attempt + 1);  // try again, slower
+      await sleep(800 * 2 ** attempt + randomJitter); // patience
+      return callGAS(action, data, attempt + 1);
     }
     return json;
   } catch (e) {
@@ -127,136 +111,179 @@ async function callGAS(action, data, attempt = 0) {
 }
 ```
 
-Max 6 retries. Jitter to avoid thundering herd. Works great in practice.
-
 ---
 
-### Layer 3 — Google Sheets (The Database You Already Know How to Use)
+## Data Model
 
-This is the part people raise an eyebrow at. "Google Sheets as a database?" Yes. And here's why it's actually genius for this use case.
-
-The data model is six sheets:
-
-| Sheet | What it stores |
+| Sheet | What lives there |
 |---|---|
 | `USERS` | USER_ID, NAME, ROLE, WARD_ID, PASSWORD_HASH, ACTIVE |
-| `WARD_ID` | Ward codes, Thai names, groups |
-| `MED_ID` | Drug catalog — ID, name, category, unit price |
-| `MED+WARD_PAR` | **Pivot matrix** — drugs × wards = PAR quantities (targets) |
-| `MED+WARD` | **Pivot matrix** — drugs × wards = actual counted quantities |
-| `LOGS` | Every event. ASSIGNED, STARTED, SUBMITTED_ITEM, SUBMITTED_SESSION. Everything. |
+| `WARD_ID` | ward codes and names |
+| `MED_ID` | drug catalog... ID, name, category, unit price |
+| `MED+WARD_PAR` | pivot: drugs × wards = target quantities |
+| `MED+WARD` | pivot: drugs × wards = actual counted quantities |
+| `LOGS` | everything that ever happened, in order |
 
-The two pivot sheets are the interesting ones. Forget long-format tables. The structure is literally:
+The pivot structure:
 
 ```
-         | ICU1 | ICU2 | SUR1 | SUR2 | OBG1 | ...
+         | ICU1 | ICU2 | SUR1 | PED4 | OBG1 | ...
 ---------|------|------|------|------|------|----
 GNR1     |  1   |  1   |  2   |  1   |  1   | ...
 GNR2     |  1   |  2   |  1   |  0   |  1   | ...
 EYE1     |  1   |  1   |  1   |  1   |  2   | ...
-HAD1     |  2   |  2   |  2   |  2   |  1   | ...
 ```
 
-First column = drug IDs. First row = ward IDs. Every cell = quantity. The pharmacist can read it, edit it, and understand it without opening a terminal or filing a ticket.
-
-**The clever bit — reading without an API:**
-
-For reads, we completely bypass GAS. The frontend calls Google's built-in `gviz` (Google Visualization Query Language) endpoint directly:
-
-```javascript
-// Zero GAS execution quota used. Zero cost. Just... reading a spreadsheet.
-async function gviz(sheetName, query = '') {
-  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=${sheetName}`;
-  const res = await fetch(url);
-  return parseGviz(await res.text());
-}
-```
-
-The spreadsheet is set to "Anyone can view." The frontend fetches it like a JSON API. No server involved. No quota burned. Both pivot sheets load in parallel, get joined in memory in the browser, and the dashboard renders. The whole read cycle is direct browser → Google CDN.
-
-**Writes are the only thing that touches GAS**, and that's appropriate — writes need validation, auth checks, and audit logging.
+Normalized long-format would be "more correct." But the people editing PAR values aren't engineers... they just need a grid they can look at, understand, and fix. Asking them to think in foreign keys is like asking someone to edit a photo by modifying the JPEG binary. Pivot wins.
 
 ---
 
-### How a Worker Audit Actually Flows
-
-Here's the full journey from "pharmacist creates assignment" to "data is in the sheet":
+## The Audit Flow
 
 ```
-1. BOSS assigns a ward to a worker
-   └─► POST /gas → writes ASSIGNED row to LOGS
+1. Boss assigns a ward to a worker
+   └─► POST → ASSIGNED row in LOGS
 
-2. WORKER opens their URL, logs in
-   └─► POST /gas (auth) → validates hash → returns userId, wardId
+2. Worker logs in
+   └─► POST (auth) → validates hash, returns session
+   └─► gviz reads LOGS → finds newest non-submitted ASSIGNED row
 
-3. WORKER starts counting
-   └─► POST /gas (startAudit) → writes STARTED row to LOGS
-   └─► Frontend fetches MED+WARD_PAR via gviz → shows drug list with PAR targets
+3. Worker starts
+   └─► POST (startAudit) → STARTED row in LOGS
+   └─► gviz fetches MED+WARD_PAR → drug list + targets rendered
 
-4. WORKER counts drugs, fills quantities, sets KPI pass/fail
+4. Worker counts every drug. Marks KPIs pass/fail.
 
-5. WORKER hits Submit
-   └─► POST /gas (submitAudit) → writes:
-       • One SUBMITTED_SESSION row (KPI results, notes)
-       • One SUBMITTED_ITEM row per drug (drugId, parQty, actualQty, variance)
+5. Worker submits
+   └─► POST (submitAudit) →
+       • 1× SUBMITTED_SESSION (KPIs, notes)
+       • 1× SUBMITTED_ITEM per drug (par, actual, variance)
 
-6. BOSS opens dashboard
-   └─► gviz fetches MED+WARD_PAR (targets) + MED+WARD (actuals) in parallel
-   └─► gviz fetches LOGS (for assignment status timeline)
-   └─► Browser joins everything in memory → renders charts + expandable drug table
+6. Boss refreshes
+   └─► gviz fetches MED+WARD_PAR + MED+WARD in parallel
+   └─► gviz fetches LOGS → reconstructs assignment cards + session history
+   └─► charts, tables, status overview render in browser
 ```
-
-No polling. No websockets. No real-time anything. The pharmacist refreshes when they want to see new data. Hospital audit workflows don't need sub-second updates — they need reliability and something that works on the hospital's WiFi.
 
 ---
 
-### The Cost Breakdown
+## Cost
 
-| Thing | Cost |
+| | |
 |---|---|
-| Frontend hosting (GitHub Pages) | **$0** |
-| Backend compute (Google Apps Script) | **$0** |
-| Database (Google Sheets) | **$0** |
-| Auth system | **$0** |
-| SSL certificate | **$0** |
-| CDN | **$0** |
-| **Total** | **$0** |
+| GitHub Pages | $0 |
+| Apps Script | $0 |
+| Google Sheets | $0 |
+| SSL, CDN | $0 |
+| **Monthly total** | **$0** |
 
-The only real constraint is GAS execution quota (6 min/day free, 30 min/day Workspace). For 50 workers submitting once a month, we burn maybe 2 minutes per audit cycle. We're nowhere near the limit.
+GAS free tier: 6 min execution/day. Actual usage per audit cycle: ~2 min. The other 4 minutes just sit there, unbothered.
 
 ---
 
-## What's in the box
+## For Workers ... How To Use
 
-```
-/
-├── index.html      → The front door. Pick your role and go.
-├── worker.html     → Where the counting happens (50 people use this daily)
-├── boss.html       → Dashboard, reports, charts, team management
-└── js/
-    ├── config.js   ← The ONLY file you touch before deploying
-    └── lang.js     ← Thai/English, because accessibility matters
-```
+You open a URL. That's most of it honestly. But here's the full picture:
+
+**Logging In**
+- Enter your name and password exactly as registered
+- First time? Whatever password you type becomes your password. No reset email, no confirmation... it just saves. Don't forget it.
+- If you see "wrong password" and you're sure it's right, ask the boss to reset it.
+
+**Starting Your Audit**
+- After login, the system finds your assignment automatically and loads your drug list
+- If you see "no assignment found," someone hasn't assigned you yet... check with the boss
+- Tap **Start** (or it may auto-start) — this logs that you began, which the boss can see
+
+**Counting**
+- Each drug shows its PAR quantity (the target) next to the input
+- Type in what you actually counted. Don't leave anything blank — the submit button won't unlock until every row has a number
+- If a drug is genuinely missing, enter `0`
+- Need to add a drug that's not on the list? Use the **+ Add** button at the bottom
+
+**KPIs**
+- Four yes/no questions at the bottom of the form
+- If you mark one as fail, a notes box appears — describe what you found
+- All four must be answered before you can submit
+
+**Submitting**
+- Hit submit, confirm, done
+- You'll see a success screen with a session ID — that's your receipt
+- You can submit more than once if needed... each submission creates a separate session and the boss can see all of them
 
 ---
 
-## Getting it running
+## For the Boss ... How To Use
 
-### 1. Google Sheets — the backbone
+Three tabs: **Overview**, **Reports**, **Manage**.
 
-1. Open your spreadsheet
-2. Run `setupSheets()` once in the GAS editor — it scaffolds all sheets with headers
-3. Set sharing to **Anyone with the link → Viewer** *(required for gviz reads)*
+### Overview
+Shows all assignments created today — one card per assignment, color coded by status:
+- 🟡 Yellow ... assigned but nobody's started yet
+- 🟢 Green ... worker is currently in progress
+- ⚫ Gray ... submitted and done
 
-### 2. Google Apps Script — the engine
+Each card shows the assigned worker, timestamps, and all submitted sessions. Click a session ID to see exactly what was submitted — every drug, PAR vs actual, variance, KPI results.
 
-1. Paste `gas_backend_v2.js` into your Apps Script project
-2. Drop your real keys into `CONFIG` at the top
-3. Deploy as Web App: **Execute as Me, Anyone can access**
-4. Copy the deployment URL
+### Reports
+Drug-level data across wards. Filter by ward, category, or search by drug name. Toggle between quantity and value view. The pie chart has a PAR / นับได้ toggle so you can compare target vs actual at a glance.
 
-### 3. Config — one file, two minutes
+### Manage
 
+**Assigning work:**
+- Pick a period (defaults to current month)
+- Pick a ward
+- Pick a worker
+- Hit assign... that's it. The worker will see it next time they log in.
+- To unassign, select **✕ Unassign** from the ward dropdown
+
+**Creating users:**
+- Name, role (worker or boss), home ward
+- The user sets their own password on first login
+- You'll see a summary box with their USER_ID after creation — copy it somewhere useful
+
+**User list:**
+- Shows all active users with their current status (today's activity only)
+- 🔓 resets their password (they set a new one on next login)
+- ✕ deactivates the account
+
+### Fixing Things in the Sheets Backend
+
+Sometimes things need manual correction. Here's where to go:
+
+**Wrong count was submitted?**
+Go to LOGS, find the SUBMITTED_ITEM rows by SESSION_ID, and correct the ACTUAL_QTY values directly. MED+WARD recalculates automatically.
+
+**Worker submitted to wrong ward?**
+Find their SUBMITTED_ITEM rows in LOGS by SESSION_ID. Change the WARD_ID column. MED+WARD picks it up on next recalculate (or hit Ctrl+Alt+F9 to force).
+
+**Need to invalidate a session entirely?**
+There's no soft delete... just find all rows with that SESSION_ID in LOGS and set ACTUAL_QTY to 0, or delete the rows directly. The formula in MED+WARD will stop including them.
+
+**User can't log in and reset doesn't help?**
+Go to USERS sheet, find the row, clear the PASSWORD_HASH cell (column E). Next login will set a fresh hash.
+
+**Assignment showing wrong status in Overview?**
+The status reads from the last LOGS row for that ASSIGNMENT_ID. If it looks wrong, check that the most recent row in LOGS for that assignment has the right EVENT_TYPE. You can manually append a correction row if needed.
+
+**Period column looks garbled?**
+Expected. gviz returns `Date(2026,3,1)` for dates written by Apps Script (month is 0-indexed, so 3 = April). The frontend normalises it. Don't filter on this column in Sheets formulas... use TIMESTAMP instead.
+
+---
+
+## Setup
+
+### 1. Google Sheets
+1. Run `setupSheets()` in the GAS editor once — scaffolds all sheets with headers
+2. Sharing → **Anyone with link → Viewer** (gviz requires this)
+
+### 2. Apps Script
+1. Paste `gas_backend_v2.js` into your project
+2. Fill in `CONFIG` at the top
+3. Deploy → Web App → **Execute as Me, Anyone can access**
+4. Copy the URL
+
+### 3. config.js
 ```javascript
 const CONFIG = {
   GAS_URL:        "https://script.google.com/macros/s/YOUR_ID/exec",
@@ -266,65 +293,67 @@ const CONFIG = {
 };
 ```
 
-### 4. Feed the sheets
-
-- **WARD_ID** — ward codes, Thai names, groups, ACTIVE = TRUE
-- **MED_ID** — drug catalog (ID, name, category, unit price)
-- **MED+WARD_PAR** — PAR pivot matrix (target quantities per drug per ward)
-- **MED+WARD** — actual pivot matrix (formula-driven from LOGS submissions)
+### 4. Seed the sheets
+- **WARD_ID** ... ward codes, Thai names, ACTIVE = TRUE
+- **MED_ID** ... drug catalog
+- **MED+WARD_PAR** ... fill the PAR pivot (or import)
+- **MED+WARD** ... paste the SUMIF formula, drag across grid
 
 ### 5. Ship it
-
-1. Push to a GitHub repo
-2. **Settings → Pages → Source: main branch / root**
-3. Done. Live. Free.
+Push to GitHub → Settings → Pages → main / root. Live.
 
 ---
 
-## URLs worth knowing
-
-**Main link:**
+## URLs
 
 ```
-https://OhmHobby.github.io/stockwardApp/index.html
-```
-
-**Worker link:**
-```
-https://OhmHobby.github.io/stockwardApp/worker.html
-```
-Generate from **Boss Dashboard → Manage → Create User**.
-
-**Boss link:**
-```
-https://OhmHobby.github.io/stockwardApp/boss.html
+https://OhmHobby.github.io/stockwardApp/index.html   ... front door
+https://OhmHobby.github.io/stockwardApp/worker.html  ... workers
+https://OhmHobby.github.io/stockwardApp/boss.html    ... boss
 ```
 
 ---
 
-## The MED+WARD actual qty formula
+## MED+WARD Formula
 
 ```
-=IFERROR(SUMPRODUCT(
-  (LOGS!$B$2:$B$5000="SUBMITTED_ITEM")*
-  (LOGS!$I$2:$I$5000=A2)*
-  (LOGS!$E$2:$E$5000=E2)*
-  LOGS!$L$2:$L$5000
-), 0)
+=IFERROR(
+  VALUE(
+    SUMIFS(
+      LOGS!$L:$L, 
+      LOGS!$E:$E, B$1, 
+      LOGS!$I:$I, $A2)
+    ), 
+  0)
 ```
 
-`A2` = DRUG_ID, `E2` = WARD_ID. Drag down. Column H = `=G2-F2` for variance.
+`A2` = drug ID, `E2` = ward ID. Drag down, drag across. Variance: `=G2-F2`.
 
 ---
 
-## Honest notes
+## Things That Bit Me
 
-- Keys in `config.js` are visible in source. Conscious trade-off. Security model = key + URL obscurity. Fine for this use case.
-- Public-view spreadsheet means LOGS are readable. That's transparency, not a vulnerability.
-- Audit periods: `YYYY-MM` format — e.g. `2026-09` for September 2026.
+Documenting these so you don't have to rediscover them.
+
+**The PERIOD column is a liar.** Apps Script writes Date objects, gviz returns them as `Date(2026,3,1)` with 0-indexed months (3 = April). Manually written rows might come back as `2026-04` or `01/04/2026`. All three formats, same column, no warning. Don't WHERE on it. Use TIMESTAMP column instead... it's always `DD/MM/YYYY HH:MM:SS` and you can parse it reliably.
+
+**`new Date("27/04/2026")` is not your friend.** JS reads the first number as month, breaks, gives you Invalid Date or silently parses something wrong. Write a manual regex parser. Four lines. Worth it. Spent an embarrassing amount of time staring at an empty overview page because of this.
+
+**Group by `ASSIGNMENT_ID`, not `WARD_ID`.** The boss can reassign a ward mid-period. If you group logs by ward, two separate sessions merge into one card with a confused status. Each assignment is its own thing.
+
+**Read LOGS bottom-to-top.** Sheets appends, so newest = last row. Scan top-down and take the first match... you get the oldest assignment, probably one from three months ago. `.reverse()` before `.find()`. Now you know for free.
 
 ---
 
-*Built lean. Deployed free. Runs a whole hospital pharmacy's audit cycle.*
+## Trade-offs
 
-*Sometimes the right architecture is the one that fits on a free tier.* 🏥
+- Keys in `config.js` are visible in source. Intentional. The security model is key + URL obscurity, which fits this tool's threat model. Don't use this for a bank.
+- Spreadsheet is public-view so LOGS are readable. For an audit system, that transparency is actually fine.
+- No real-time updates. Refresh when you want fresh data. Monthly audits don't need sub-second sync... and keeping it simple keeps it reliable.
+- If 50 workers submit at the exact same second, some retries happen. In practice they don't, because people finish at different times. If it becomes a problem: stagger the window.
+
+---
+
+Built for what the problem actually was. Works because the pieces fit.
+
+That's the whole thing. 🏥
